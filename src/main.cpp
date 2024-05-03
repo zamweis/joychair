@@ -83,47 +83,38 @@ void checkForMovement() {
     Serial.print("Smoothed Gz: "); Serial.println(gyroZ);
     */
 
-    // Compute movement detection flags
-    bool moveRight = accelerationX > accelerationThreshold;
-    bool moveLeft = accelerationX < -accelerationThreshold;
-    bool moveBackward = accelerationY > accelerationThreshold;
-    bool moveForward = accelerationY < -accelerationThreshold;
-    bool rotateRight = gyroY > gyroThreshold;  // Adjusted for rotation around y-axis
-    bool rotateLeft = gyroY < -gyroThreshold; // Adjusted for rotation around y-axis
-    bool jumpDetected = accelerationZ > jumpThreshold; // Adjusted for jump detection along z-axis
-
     // Map movements to joystick controls
-    joystick.setXAxis(moveLeft ? -accelerationX : (moveRight ? accelerationX : 0));
-    joystick.setYAxis(moveForward ? -accelerationY : (moveBackward ? accelerationY : 0));
-    joystick.setRzAxis(rotateLeft ? -gyroY : (rotateRight ? gyroY : 0)); // Adjusted for rotation around y-axis
+    joystick.setXAxis(abs(accelerationX) > accelerationXDeadzone ? accelerationX : 0);
+    joystick.setYAxis(abs(accelerationY) > accelerationYDeadzone ? accelerationY : 0);
+    joystick.setRzAxis(abs(gyroZ) > gyroThreshold ? gyroZ : 0);
 
     // Handle specific buttons for rotational moves
-    joystick.setButton(1, rotateRight);    // Rotate right
-    joystick.setButton(2, rotateLeft);     // Rotate left
+    joystick.setButton(1, gyroY > gyroThreshold ? 1 : 0);    // Rotate right
+    joystick.setButton(2, gyroY < -gyroThreshold ? 1 : 0);   // Rotate left
 
     // Directions based on accelerometer thresholds
-    joystick.setButton(3, moveRight);      // Move right
-    joystick.setButton(4, moveLeft);       // Move left
-    joystick.setButton(5, moveBackward);   // Move backward
-    joystick.setButton(6, moveForward);    // Move forward
+    joystick.setButton(3, accelerationX > accelerationThreshold ? 1 : 0);   // Move right
+    joystick.setButton(4, accelerationX < -accelerationThreshold ? 1 : 0);  // Move left
+    joystick.setButton(5, accelerationY > accelerationThreshold ? 1 : 0);   // Move backward
+    joystick.setButton(6, accelerationY < -accelerationThreshold ? 1 : 0);  // Move forward
 
     // Output detected movements to the console
-    if (moveRight) {
+    if (accelerationX > accelerationThreshold) {
         Serial.println("Moving right");
-    } else if (moveLeft) {
+    } else if (accelerationX < -accelerationThreshold) {
         Serial.println("Moving left");
     }
-    if (moveBackward) {
+    if (accelerationY > accelerationThreshold) {
         Serial.println("Moving backward");
-    } else if (moveForward) {
+    } else if (accelerationY < -accelerationThreshold) {
         Serial.println("Moving forward");
     }
-    if (rotateRight) {
+    if (gyroY > gyroThreshold) {
         Serial.println("Rotating right");
-    } else if (rotateLeft) {
+    } else if (gyroY < -gyroThreshold) {
         Serial.println("Rotating left");
     }
-    if (jumpDetected) {
+    if (accelerationZ > jumpThreshold) {
         Serial.println("Jump detected");
     }
 }
