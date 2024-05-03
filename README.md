@@ -1,5 +1,4 @@
-# joychair
-## ChairIO Interface for VR Navigation
+# ChairIO Interface for VR Navigation
 
 Welcome to the ChairIO Interface project! This project aims to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments, allowing users to navigate virtual worlds by shifting their weight on the chair. The idea behind this project is inspired by the concept of ChairIO, as described in the paper ["ChairIO - the Chair-Based Interface"](https://www.researchgate.net/publication/233819716_ChairIO--the_Chair-Based_Interface).
 
