@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Joystick.h>
 #include <MPU6050.h>
-#include <algorithm>
 
 MPU6050 mpu;
 int16_t accelerationX;
@@ -23,7 +22,7 @@ Joystick_ joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
                    true, true, false,   // X and Y Axes (used for left-right and forward-backward)
                    false, false, true); // No Rx, No Ry, Rz for Rotation (used for rotating left-right)
 
-const int numReadings = 3000;
+const int numReadings = 1000;
 const int gyroThreshold = 6000;
 const int jumpThreshold = 10000;
 
@@ -41,8 +40,6 @@ void checkForMovement();
 void setup() {
   Serial.begin(115200);
   Wire.begin();
-  
-  Serial.println("Initializing...");
   
   mpu.initialize();
   
@@ -76,21 +73,7 @@ void loop() {
 }
 
 void checkForMovement() {
-    // Map movements to joystick controls
-    joystick.setXAxis(abs(accelerationX) > accelerationXDeadzone ? accelerationX : 0);
-    joystick.setYAxis(abs(accelerationY) > accelerationYDeadzone ? accelerationY : 0);
-    joystick.setRzAxis(abs(gyroZ) > gyroThreshold ? gyroZ : 0);
-
-    // Handle specific buttons for rotational moves
-    joystick.setButton(1, gyroX > gyroThreshold ? 1 : 0);    // Rotate right
-    joystick.setButton(2, gyroX < -gyroThreshold ? 1 : 0);   // Rotate left
-
-    // Directions based on accelerometer thresholds
-    joystick.setButton(3, accelerationX > accelerationThreshold ? 1 : 0);   // Move right
-    joystick.setButton(4, accelerationX < -accelerationThreshold ? 1 : 0);  // Move left
-    joystick.setButton(5, accelerationY > accelerationThreshold ? 1 : 0);   // Move backward
-    joystick.setButton(6, accelerationY < -accelerationThreshold ? 1 : 0);  // Move forward
-
+    /*
     // Output detected movements to the console or update game state
     Serial.print("Smoothed Ax: "); Serial.print(accelerationX); Serial.print(", ");
     Serial.print("Smoothed Ay: "); Serial.print(accelerationY); Serial.print(", ");
@@ -98,9 +81,56 @@ void checkForMovement() {
     Serial.print("Smoothed Gx: "); Serial.print(gyroX); Serial.print(", ");
     Serial.print("Smoothed Gy: "); Serial.print(gyroY); Serial.print(", ");
     Serial.print("Smoothed Gz: "); Serial.println(gyroZ);
+    */
+
+    // Compute movement detection flags
+    bool moveRight = accelerationX > accelerationThreshold;
+    bool moveLeft = accelerationX < -accelerationThreshold;
+    bool moveBackward = accelerationY > accelerationThreshold;
+    bool moveForward = accelerationY < -accelerationThreshold;
+    bool rotateRight = gyroY > gyroThreshold;  // Adjusted for rotation around y-axis
+    bool rotateLeft = gyroY < -gyroThreshold; // Adjusted for rotation around y-axis
+    bool jumpDetected = accelerationZ > jumpThreshold; // Adjusted for jump detection along z-axis
+
+    // Map movements to joystick controls
+    joystick.setXAxis(moveLeft ? -accelerationX : (moveRight ? accelerationX : 0));
+    joystick.setYAxis(moveForward ? -accelerationY : (moveBackward ? accelerationY : 0));
+    joystick.setRzAxis(rotateLeft ? -gyroY : (rotateRight ? gyroY : 0)); // Adjusted for rotation around y-axis
+
+    // Handle specific buttons for rotational moves
+    joystick.setButton(1, rotateRight);    // Rotate right
+    joystick.setButton(2, rotateLeft);     // Rotate left
+
+    // Directions based on accelerometer thresholds
+    joystick.setButton(3, moveRight);      // Move right
+    joystick.setButton(4, moveLeft);       // Move left
+    joystick.setButton(5, moveBackward);   // Move backward
+    joystick.setButton(6, moveForward);    // Move forward
+
+    // Output detected movements to the console
+    if (moveRight) {
+        Serial.println("Moving right");
+    } else if (moveLeft) {
+        Serial.println("Moving left");
+    }
+    if (moveBackward) {
+        Serial.println("Moving backward");
+    } else if (moveForward) {
+        Serial.println("Moving forward");
+    }
+    if (rotateRight) {
+        Serial.println("Rotating right");
+    } else if (rotateLeft) {
+        Serial.println("Rotating left");
+    }
+    if (jumpDetected) {
+        Serial.println("Jump detected");
+    }
 }
 
 void calibrateSensors() {
+    int32_t accelerationXSum = 0, accelerationYSum = 0, accelerationZSum = 0;
+    int32_t gyroXSum = 0, gyroYSum = 0, gyroZSum = 0;
     int16_t accelerationXReading, accelerationYReading, accelerationZReading;
     int16_t gyroXReading, gyroYReading, gyroZReading;
 
@@ -113,29 +143,41 @@ void calibrateSensors() {
     }
 
     // Collect sufficient data for calibration
-    int16_t accelerationXReadings[numReadings];
-    int16_t accelerationYReadings[numReadings];
-    int16_t accelerationZReadings[numReadings];
-
     for (int i = 0; i < numReadings; i++) {
         mpu.getMotion6(&accelerationXReading, &accelerationYReading, &accelerationZReading, &gyroXReading, &gyroYReading, &gyroZReading);
         
         // Accumulate sensor readings
-        accelerationXReadings[i] = accelerationXReading; 
-        accelerationYReadings[i] = accelerationYReading; 
-        accelerationZReadings[i] = accelerationZReading;
+        accelerationXSum += accelerationXReading; 
+        accelerationYSum += accelerationYReading; 
+        accelerationZSum += accelerationZReading;
+        gyroXSum += gyroXReading; 
+        gyroYSum += gyroYReading; 
+        gyroZSum += gyroZReading;
     }
 
-    // Sort the readings
-    std::sort(accelerationXReadings, accelerationXReadings + numReadings);
-    std::sort(accelerationYReadings, accelerationYReadings + numReadings);
-    std::sort(accelerationZReadings, accelerationZReadings + numReadings);
+    // Calculate average readings
+    accelerationXOffset = accelerationXSum / numReadings;
+    accelerationYOffset = accelerationYSum / numReadings;
+    accelerationZOffset = accelerationZSum / numReadings;
+    gyroXOffset = gyroXSum / numReadings;
+    gyroYOffset = gyroYSum / numReadings;
+    gyroZOffset = gyroZSum / numReadings;
 
-    // Calculate the 90th percentile
-    int index90th = numReadings * 0.9;
-    accelerationXDeadzone = abs(accelerationXReadings[index90th] - accelerationXOffset);
-    accelerationYDeadzone = abs(accelerationYReadings[index90th] - accelerationYOffset);
-    accelerationZDeadzone = abs(accelerationZReadings[index90th] - accelerationZOffset);
+    // Calculate standard deviation for dead zone
+    float accelerationXVariance = 0.0, accelerationYVariance = 0.0, accelerationZVariance = 0.0;
+    for (int i = 0; i < numReadings; i++) {
+        mpu.getMotion6(&accelerationXReading, &accelerationYReading, &accelerationZReading, &gyroXReading, &gyroYReading, &gyroZReading);
+        
+        // Calculate variance for each axis
+        accelerationXVariance += sq(accelerationXReading - accelerationXOffset); 
+        accelerationYVariance += sq(accelerationYReading - accelerationYOffset); 
+        accelerationZVariance += sq(accelerationZReading - accelerationZOffset);    
+    }
+
+    // Update dead zone thresholds based on standard deviation
+    accelerationXDeadzone = sqrt(accelerationXVariance / numReadings);
+    accelerationYDeadzone = sqrt(accelerationYVariance / numReadings);
+    accelerationZDeadzone = sqrt(accelerationZVariance / numReadings);
 
     Serial.println("Calibration complete.");
     Serial.print("Offsets: ");
@@ -150,3 +192,4 @@ void calibrateSensors() {
     Serial.print(accelerationYDeadzone); Serial.print(", ");
     Serial.println(accelerationZDeadzone);
 }
+
