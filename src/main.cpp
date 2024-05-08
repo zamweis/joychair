@@ -89,9 +89,8 @@ void checkForMovement() {
 
     
     // Enhanced button logic using thresholds and direction
-    // filter out jumping because of inaccurancy
-    if (accelerationZ > jumpThreshold)
-    {
+    // Filter out jumping because of inaccurancy
+    if (accelerationZ > jumpThreshold) {
         joystick.setButton(0, 1);
         Serial.println("Jump detected with height: " + String(accelerationZ));
     } else {
@@ -130,11 +129,13 @@ void calibrateSensors() {
 
     Serial.println("Calibrating sensors, make sure the device is stationary and flat...");
 
+    // Discard the first 100 readings to allow the sensor to stabilize
     for (int i = 0; i < 100; i++) {
         mpu.getMotion6(&accelerationXReading, &accelerationYReading, &accelerationZReading, &gyroXReading, &gyroYReading, &gyroZReading);
         delay(10);
     }
 
+    // Collect data for averaging
     for (int i = 0; i < numReadings; i++) {
         mpu.getMotion6(&accelerationXReading, &accelerationYReading, &accelerationZReading, &gyroXReading, &gyroYReading, &gyroZReading);
 
@@ -146,10 +147,21 @@ void calibrateSensors() {
         gyroZSum += gyroZReading;
     }
 
+    // Calculate average offset values
     accelerationXOffset = accelerationXSum / numReadings;
     accelerationYOffset = accelerationYSum / numReadings;
     accelerationZOffset = accelerationZSum / numReadings;
     gyroXOffset = gyroXSum / numReadings;
     gyroYOffset = gyroYSum / numReadings;
     gyroZOffset = gyroZSum / numReadings;
+
+    // Output the calculated offsets
+    Serial.println("Calibration complete.");
+    Serial.println("Offsets:");
+    Serial.print("    AX: "); Serial.println(accelerationXOffset);
+    Serial.print("    AY: "); Serial.println(accelerationYOffset);
+    Serial.print("    AZ: "); Serial.println(accelerationZOffset);
+    Serial.print("    GX: "); Serial.println(gyroXOffset);
+    Serial.print("    GY: "); Serial.println(gyroYOffset);
+    Serial.print("    GZ: "); Serial.println(gyroZOffset);
 }
