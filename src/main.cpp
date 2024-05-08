@@ -10,9 +10,9 @@ int16_t accelerationXOffset, accelerationYOffset, accelerationZOffset;
 int16_t gyroXOffset, gyroYOffset, gyroZOffset;
 
 Joystick_ joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
-                   7, 0,                  // 7 Buttons, no Hat Switch
-                   true, true, true,      // X, Y, and Z Axes
-                   false, false, true);   // No Rx, No Ry, Rz for Rotation
+                   7, 0,                // 7 Buttons, no Hat Switch
+                   true, true, true,    // X, Y, and Z Axes
+                   true, true, true);   // Rx, Ry, and Rz for Rotation
 
 const int numReadings = 1000;
 const int gyroThreshold = 6000;
@@ -34,7 +34,7 @@ void setup() {
     Serial.println("MPU6050 connection failed");
     while (1); // Halt if connection failed
   }
-  
+  mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
   calibrateSensors();
   joystick.begin();
   Serial.println("Device is calibrated and ready!");
@@ -63,28 +63,46 @@ void applyOffsets() {
 void checkForMovement() {
     // Use smoothing or filtering to reduce noise and improve control
     float smoothFactor = 0.9;  // Adjust based on responsiveness vs. smoothness
-    static int lastX = 0, lastY = 0, lastRz = 0;
+    static int lastX = 0, lastY = 0, lastZ = 0;
+    static int lastRx = 0, lastRy = 0, lastRz = 0;
 
     int filteredX = smoothFactor * lastX + (1 - smoothFactor) * accelerationX;
     int filteredY = smoothFactor * lastY + (1 - smoothFactor) * accelerationY;
+    int filteredZ = smoothFactor * lastZ + (1 - smoothFactor) * accelerationZ;
+    int filteredRx = smoothFactor * lastRx + (1 - smoothFactor) * gyroX;
+    int filteredRy = smoothFactor * lastRy + (1 - smoothFactor) * gyroY;
     int filteredRz = smoothFactor * lastRz + (1 - smoothFactor) * gyroZ;
 
     lastX = filteredX;
     lastY = filteredY;
+    lastZ = filteredZ;
+    lastRx = filteredRx;
+    lastRy = filteredRy;
     lastRz = filteredRz;
 
     joystick.setXAxis(filteredX);
     joystick.setYAxis(filteredY);
+    joystick.setZAxis(filteredZ);
+    joystick.setRxAxis(filteredRx);
+    joystick.setRyAxis(filteredRy);
     joystick.setRzAxis(filteredRz);
 
+    
     // Enhanced button logic using thresholds and direction
-    joystick.setButton(0, accelerationZ > jumpThreshold);
-    joystick.setButton(1, gyroY > gyroThreshold);
-    joystick.setButton(2, gyroY < -gyroThreshold);
-    joystick.setButton(3, accelerationX > accelerationThreshold);
-    joystick.setButton(4, accelerationX < -accelerationThreshold);
-    joystick.setButton(5, accelerationY > accelerationThreshold);
-    joystick.setButton(6, accelerationY < -accelerationThreshold);
+    // filter out jumping because of inaccurancy
+    if (accelerationZ > jumpThreshold)
+    {
+        joystick.setButton(0, 1);
+        Serial.println("Jump detected with height: " + String(accelerationZ));
+    } else {
+        joystick.setButton(0, 0);
+        joystick.setButton(1, gyroY > gyroThreshold);
+        joystick.setButton(2, gyroY < -gyroThreshold);
+        joystick.setButton(3, accelerationX > accelerationThreshold);
+        joystick.setButton(4, accelerationX < -accelerationThreshold);
+        joystick.setButton(5, accelerationY > accelerationThreshold);
+        joystick.setButton(6, accelerationY < -accelerationThreshold);
+    }
 
     // Detailed output for each movement detection
     if (accelerationX > accelerationThreshold) {
@@ -101,9 +119,6 @@ void checkForMovement() {
         Serial.println("Rotating right with speed: " + String(filteredRz));
     } else if (gyroY < -gyroThreshold) {
         Serial.println("Rotating left with speed: " + String(filteredRz));
-    }
-    if (accelerationZ > jumpThreshold) {
-        Serial.println("Jump detected with height: " + String(accelerationZ));
     }
 }
 
