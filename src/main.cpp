@@ -62,15 +62,10 @@ void setup() {
 }
 
 void loop() {
-    static unsigned long lastMillis = 0;
-    if (millis() - lastMillis >= 10) {
-        lastMillis = millis();
-        
-        mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
-        applyOffsets();
-        applyRotation();
-        checkForMovement();
-    }
+    mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
+    applyOffsets();
+    applyRotation();
+    checkForMovement();
 }
 
 void applyOffsets() {
@@ -251,7 +246,7 @@ void checkForSignificantLean() {
         }
 
         float tiltMagnitude = sqrt(tiltMagnitudeSquared);
-        Serial.println("Tilt Magnitude: " + String(tiltMagnitude));  // Debug output
+        // Serial.println("Tilt Magnitude: " + String(tiltMagnitude));  // Debug output
 
         if (tiltMagnitude > 5000) {  // Threshold can be adjusted as needed
             Serial.println("Significant lean detected. Proceeding to define the axis...");
