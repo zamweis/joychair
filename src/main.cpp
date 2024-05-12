@@ -27,11 +27,14 @@ float forwardSine = 0.0;    // Default-value (no rotation)
 
 void calibrateSensors();
 void checkForMovement();
+void checkForSignificantLean();
 void applyOffsets();
 void applyRotation();
 void detectPlayer();
 void defineAxis();
+void playInitSound();
 void playSuccessSound();
+void playSetupCompleteSound();
 
 void setup() {
     Serial.begin(115200);
@@ -47,10 +50,14 @@ void setup() {
     pinMode(8, OUTPUT);     // Set digital pin 8 as an OUTPUT for buzzer
     calibrateSensors();
     joystick.begin();
+
     Serial.println("Device is calibrated. Waiting for player...");
 
-    detectPlayer();  // Ensure player is detected before proceeding
-    defineAxis();    // Then define the axis based on the player's orientation
+    detectPlayer();             // Ensure player is detected before proceeding
+    checkForSignificantLean();  // Wait for player to lean forward
+    defineAxis();               // Then define the axis based on the player's orientation
+
+    playSetupCompleteSound();
     Serial.println("Setup complete. Device is ready to use!");
 }
 
@@ -60,7 +67,7 @@ void loop() {
         lastMillis = millis();
         
         mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
-        //applyOffsets();
+        applyOffsets();
         applyRotation();
         checkForMovement();
     }
@@ -142,14 +149,7 @@ void checkForMovement() {
 
 void calibrateSensors() {
     delay(1000);
-
-    // Buzzer
-    tone(8, 1000);  // Play tone at 1000 Hz
-    delay(200);     // Continue for 1 second
-    noTone(8);      // Stop the tone
-    tone(8, 1000);
-    delay(200);
-    noTone(8);
+    playInitSound();
 
     Serial.println("Calibrating...");
     int32_t accelerationXSum = 0, accelerationYSum = 0, accelerationZSum = 0;
@@ -200,54 +200,73 @@ void calibrateSensors() {
 }
 
 void defineAxis() {
-    Serial.println("Lean forward to define the forward direction.");
-    Serial.println("Please hold the position for a few seconds...");
-
-    // Give the player some time
-    // TODO: implement proper direction dection function
-    delay(250);
-
+    Serial.println("Defining the forward axis based on the average lean direction...");
     unsigned long startTime = millis();
-    const int defineDuration = 5000; // Duration to capture the forward tilt in milliseconds
-    float maxTiltMagnitude = 360.0; // To capture the maximum tilt magnitude
-    int16_t bestX = 0, bestY = 0;
+    const int defineDuration = 5000; // Duration to collect data for averaging
+    int16_t sumX = 0, sumY = 0, count = 0;
 
-    // Buzzer
-    tone(8, 500);
-
-    // TODO: improve the forward detection by calculation average leaning direction
     while (millis() - startTime < defineDuration) {
         mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
         applyOffsets();
 
-        // Calculate the magnitude of tilt in the XY plane
-        float tiltMagnitude = sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
-
-        // Check if the current tilt magnitude is the maximum detected
-        if (tiltMagnitude < maxTiltMagnitude) {
-            maxTiltMagnitude = tiltMagnitude;
-            bestX = accelerationX;
-            bestY = accelerationY;
-        }
-
+        sumX += accelerationX;
+        sumY += accelerationY;
+        count++;
         delay(10); // Short delay between measurements
     }
 
-    // Calculate the angle for the most significant forward direction
-    float forwardAngle = atan2(bestY, bestX);
+    // Calculate the average components
+    float avgX = float(sumX) / count;
+    float avgY = float(sumY) / count;
+    float forwardAngle = atan2(avgY, avgX);  // Calculate angle based on average
 
-    // Buzzer
-    noTone(8); // Stop the tone
-    
-    Serial.print("Forward direction defined at maximum lean angle: ");
-    Serial.println(forwardAngle * 180 / PI);
-
-    // Save the cosine and sine values for the global transformation
     forwardCosine = cos(forwardAngle);
     forwardSine = sin(forwardAngle);
+
+    Serial.print("Forward direction defined at average lean angle: ");
+    Serial.println(forwardAngle * 180 / PI);
+    playSuccessSound();
 }
 
+void checkForSignificantLean() {
+    delay(1000);
+    Serial.println("Waiting for a significant lean to define the forward direction...");
+    playInitSound();  // Signal the start of detection
+    bool significantLeanDetected = false;
+
+    while (!significantLeanDetected) {
+        mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
+        applyOffsets();
+
+        // Check for extreme or invalid readings
+        if (accelerationX == 0 && accelerationY == 0) {
+            Serial.println("Warning: Zero or invalid sensor readings detected.");
+            continue;  // Skip this loop iteration if readings are zero
+        }
+
+        float tiltMagnitudeSquared = float(accelerationX) * accelerationX + float(accelerationY) * accelerationY;
+        if (tiltMagnitudeSquared < 0) {
+            Serial.println("Error: Negative value calculated for tilt magnitude squared.");
+            continue;  // Skip this iteration if calculated square is negative
+        }
+
+        float tiltMagnitude = sqrt(tiltMagnitudeSquared);
+        Serial.println("Tilt Magnitude: " + String(tiltMagnitude));  // Debug output
+
+        if (tiltMagnitude > 5000) {  // Threshold can be adjusted as needed
+            Serial.println("Significant lean detected. Proceeding to define the axis...");
+            significantLeanDetected = true;
+            playSuccessSound();
+            break;  // Exit the loop
+        }
+        delay(10);  // Short delay for stability
+    }
+}
+
+
 void detectPlayer() {
+    delay(1000);
+    playInitSound();
     int stableReadings = 0;
     const int requiredStableReadings = 10;  // Reduced for more sensitivity
     float accelerationZThreshold = 17000;   // Define a specific threshold for Z-axis
@@ -256,7 +275,7 @@ void detectPlayer() {
 
     while (!isPlayerPrensent) {
         mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
-        //applyOffsets();
+        applyOffsets();
 
         // Debugging output to monitor Z-axis values
         // Serial.print("Z-Axis reading: ");
@@ -268,7 +287,6 @@ void detectPlayer() {
             if (stableReadings >= requiredStableReadings) {
                 isPlayerPrensent = true;
                 Serial.println("Player detected on chair.");
-                playSuccessSound();
                 break;  // Exit the loop once the player is detected
             }
         } else {
@@ -276,6 +294,7 @@ void detectPlayer() {
         }
         delay(10);  // Short delay to debounce the detection
     }
+    playSuccessSound();
 }
 
 void applyRotation() {
@@ -286,12 +305,42 @@ void applyRotation() {
     accelerationY = newY;
 }
 
-void playSuccessSound(){
+void playInitSound() {
+    // Buzzer
     tone(8, 1000);  // Play tone at 1000 Hz
-    delay(250);     // Continue for 0.75 seconds
-    tone(8, 1200);  // Play tone at 1000 Hz
-    delay(250);
-    tone(8, 1400);
-    delay(250);
+    delay(150);     // Continue for 1 second
+    noTone(8);      // Stop the tone
+    delay(150);
+    tone(8, 1000);
+    delay(150);
     noTone(8);
+}
+
+void playSuccessSound() {
+    tone(8, 1000);  // Play tone at 1000 Hz
+    delay(150);     // Continue for 0.75 seconds
+    tone(8, 1200);  // Play tone at 1000 Hz
+    delay(150);
+    tone(8, 1400);
+    delay(150);
+    noTone(8);
+}
+
+void playSetupCompleteSound() {
+    // Play a simple ascending tone sequence to indicate completion
+    tone(8, 800);   // Play tone at 800 Hz
+    delay(150);     // Continue for 0.2 seconds
+    tone(8, 1000);  // Increase tone to 1000 Hz
+    delay(150);     // Continue for 0.2 seconds
+    tone(8, 1200);  // Increase tone further to 1200 Hz
+    delay(150);     // Continue for 0.2 seconds
+    noTone(8);      // Stop the tone
+
+    // Add a short pause
+    delay(150);
+
+    // Play a final high tone to definitively signal readiness
+    tone(8, 1500);  // Play a higher tone at 1500 Hz
+    delay(300);     // Continue for 0.3 seconds
+    noTone(8);      // Stop the tone
 }
