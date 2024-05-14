@@ -20,6 +20,10 @@ const int jumpThreshold = 2000; // Adjusted from 10000, consider the new sensiti
 const int accelerationThreshold = 1000; // Adjusted from 5000
 const float leanThreshold = 100.0; // Degrees, reduced from 45 for sensitivity
 
+// mapping range variables
+int16_t rangeGyro = 7000;
+int16_t rangeAccelXY = 1000;
+int16_t rangeAccelZ = 4000;
 
 bool isPlayerPresent = false;
 
@@ -72,15 +76,14 @@ void loop() {
     static unsigned long lastMillis = 0;
     if (millis() - lastMillis >= 10) {
         lastMillis = millis();
-        
         mpu.getMotion6(&accelerationX, &accelerationY, &accelerationZ, &gyroX, &gyroY, &gyroZ);
         
-        accelerationX = map(accelerationX, -1500, 1500, 0, 1023);
-        accelerationY = map(accelerationY, -1500, 1500, 0, 1023);
-        accelerationZ = map(accelerationZ, -3000, 3000, 0, 1023);
-        gyroX = map(gyroX, -5000, 5000, 0, 1023);
-        gyroY = map(gyroY, -5000, 5000, 0, 1023);
-        gyroZ = map(gyroZ, -5000, 5000, 0, 1023);
+        accelerationX = map(accelerationX, -rangeAccelXY, rangeAccelXY, 0, 1023);
+        accelerationY = map(accelerationY, -rangeAccelXY, rangeAccelXY, 0, 1023);
+        accelerationZ = map(accelerationZ, -rangeAccelZ, rangeAccelZ, 0, 1023);
+        gyroX = map(gyroX, -rangeGyro, rangeGyro, 0, 1023);
+        gyroY = map(gyroY, -rangeGyro, rangeGyro, 0, 1023);
+        gyroZ = map(gyroZ, -rangeGyro, rangeGyro, 0, 1023);
 
         //applySensorFusion();
         checkForMovement();
