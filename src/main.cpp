@@ -11,9 +11,11 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
                    false, false,           // rudder and throttle
                    false, false, false);   // accelerator, brake, and steering
 
+int16_t applyDeadzone(int16_t value, int16_t deadzone);
 void playInitSound();
 void playSuccessSound();
 void playSetupCompleteSound();
+void playErrorSound();
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -22,6 +24,7 @@ VectorFloat gravity;
 float ypr[3];  // yaw, pitch, roll
 
 void setup() {
+  playInitSound();
   Serial.begin(115200);
   Wire.begin();
 
@@ -31,6 +34,7 @@ void setup() {
   mpu.initialize();
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection failed!");
+    playErrorSound();
     while (1);
   }
   
@@ -42,16 +46,20 @@ void setup() {
     Serial.println("DMP ready!");
   } else {
     Serial.print("DMP Initialization failed (code ");
+    playErrorSound();
     Serial.print(devStatus);
     Serial.println(")");
   }
+
+  mpu.CalibrateAccel();
+  mpu.CalibrateGyro();
   
   pinMode(8, OUTPUT);     // Set digital pin 8 as an OUTPUT for buzzer
   Joystick.begin(false);
   playSetupCompleteSound();
 }
 
-int16_t jumpThreshold = 1020;
+int16_t jumpThreshold = 800;
 
 void loop() {
   // Check if there's new data from the DMP
@@ -63,29 +71,37 @@ void loop() {
     // Get yaw, pitch, and roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
+    float accelZ = mpu.getAccelerationZ() - 16383; 
+
     // Convert to degrees
     float yaw = ypr[0] * 180/M_PI;
     float pitch = ypr[1] * 180/M_PI;
     float roll = ypr[2] * 180/M_PI;
-
+/*
     Serial.print(F("roll: ")); Serial.print(roll);
     Serial.print(F(", pitch: ")); Serial.print(pitch);
-    Serial.print(F(", yaw: ")); Serial.println(yaw);
+    Serial.print(F(", yaw: ")); Serial.print(yaw);  
+    Serial.print(F(", accelZ: ")); Serial.print(accelZ);
+*/
 
     // Linearly map angles and accelerations to joystick ranges
-    int16_t joystickX = map(roll, -60, 60, 0, 1023);
-    int16_t joystickY = map(pitch, -60, 60, 0, 1023);
-    int16_t joystickZ = map(gravity.z * 100, -200, 200, 0, 1023);
-    int16_t joystickRx = map(yaw, -180, 180, 0, 1023);
-    int16_t joystickRy = map(pitch, -90, 90, 0, 1023);
+    int16_t joystickX = map(roll, -45, 45, 0, 1023);
+    int16_t joystickY = map(pitch, -45, 45, 0, 1023);
+    int16_t joystickZ = map(accelZ, -32767, 32767, 0, 1023);
+    int16_t joystickRx = map(pitch, -90, 90, 0, 1023);
+    int16_t joystickRy = map(yaw, -180, 180, 0, 1023)+11; // Sensor got error of 14
     int16_t joystickRz = map(roll, -90, 90, 0, 1023);
 
-    Serial.print(F(", joystickX: ")); Serial.print(joystickX);
+    Serial.print(F("joystickX: ")); Serial.print(joystickX);
     Serial.print(F(", joystickY: ")); Serial.print(joystickY);
     Serial.print(F(", joystickZ: ")); Serial.print(joystickZ);
     Serial.print(F(", joystickRx: ")); Serial.print(joystickRx);
     Serial.print(F(", joystickRy: ")); Serial.print(joystickRy);
     Serial.print(F(", joystickRz: ")); Serial.println(joystickRz);
+
+    // Deadzones for X-and Y-Axis
+    joystickX = applyDeadzone(joystickX, 11);
+    joystickY = applyDeadzone(joystickY, 11);
 
     Joystick.setXAxis(joystickX);
     Joystick.setYAxis(joystickY);
@@ -106,6 +122,21 @@ void loop() {
   }
 }
 
+int16_t applyDeadzone(int16_t value, int16_t deadzone) {
+    // Calculate the center point of the output range
+    const int16_t center = 511;  // Center for the range [0, 1023]
+    int16_t distance = value - center;
+    
+    // If the distance from center is less than the deadzone, set output to center
+    if (abs(distance) < deadzone) {
+        return center;
+    } else {
+        // If outside the deadzone, adjust the value linearly from the edge of the deadzone
+        return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) : 
+                                map(distance, -511, -deadzone, 0, center - deadzone);
+    }
+}
+
 void playInitSound() {
   // Buzzer
   tone(8, 1000);  // Play tone at 1000 Hz
@@ -115,6 +146,17 @@ void playInitSound() {
   tone(8, 1000);
   delay(150);
   noTone(8);
+}
+
+void playErrorSound() {
+    // Buzzer emits a distinct error sound, using a lower tone
+    tone(8, 500);   // Play tone at 500 Hz
+    delay(250);     // Continue for 0.25 seconds
+    noTone(8);      // Stop the tone
+    delay(100);     // Short pause
+    tone(8, 500);   // Repeat tone at 500 Hz
+    delay(250);     // Continue for 0.25 seconds
+    noTone(8);      // Stop the tone
 }
 
 void playSuccessSound() {
