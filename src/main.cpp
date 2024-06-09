@@ -22,12 +22,24 @@ uint8_t fifoBuffer[64];
 Quaternion q;
 VectorFloat gravity;
 float ypr[3];  // yaw, pitch, roll
+// Define pin numbers for the RGB LED
+int redPin = 11;
+int greenPin = 10;
+int bluePin = 9;
+long previousMillis = 0;  // will store last time LED was updated
+long interval = 250;  // interval at which to blink (milliseconds)
+int16_t jumpThreshold = 800;
 
 void setup() {
+  // Set the RGB LED pins as output
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  pinMode(8, OUTPUT);       // Set digital pin 8 as an OUTPUT for buzzer
   playInitSound();
+  delay(1000);
   Serial.begin(115200);
   Wire.begin();
-
   Serial.println("Initializing...");
 
   // Initialize MPU6050
@@ -54,14 +66,24 @@ void setup() {
   mpu.CalibrateAccel();
   mpu.CalibrateGyro();
   
-  pinMode(8, OUTPUT);     // Set digital pin 8 as an OUTPUT for buzzer
+  delay(1000);
   Joystick.begin(false);
   playSetupCompleteSound();
 }
 
-int16_t jumpThreshold = 800;
 
 void loop() {
+  long currentMillis = millis();
+
+  // Non-blocking LED blink code
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    // if the LED is off turn it on and vice-versa:
+    digitalWrite(redPin, LOW);
+    digitalWrite(greenPin, !digitalRead(greenPin));
+    digitalWrite(bluePin, LOW);
+  }
   // Check if there's new data from the DMP
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
     // Get the quaternion data
@@ -118,7 +140,6 @@ void loop() {
     }
 
     Joystick.sendState(); // Send the updated state to the host
-    delay(3);
   }
 }
 
@@ -138,52 +159,61 @@ int16_t applyDeadzone(int16_t value, int16_t deadzone) {
 }
 
 void playInitSound() {
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, LOW);
   // Buzzer
-  tone(8, 1000);  // Play tone at 1000 Hz
+  tone(6, 1000);  // Play tone at 1000 Hz
   delay(150);     // Continue for 1 second
-  noTone(8);      // Stop the tone
+  noTone(6);      // Stop the tone
   delay(150);
-  tone(8, 1000);
+  tone(6, 1000);
   delay(150);
-  noTone(8);
+  noTone(6);
 }
 
 void playErrorSound() {
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, LOW);
+  digitalWrite(bluePin, LOW);
     // Buzzer emits a distinct error sound, using a lower tone
-    tone(8, 500);   // Play tone at 500 Hz
+    tone(6, 500);   // Play tone at 500 Hz
     delay(250);     // Continue for 0.25 seconds
-    noTone(8);      // Stop the tone
+    noTone(6);      // Stop the tone
     delay(100);     // Short pause
-    tone(8, 500);   // Repeat tone at 500 Hz
+    tone(6, 500);   // Repeat tone at 500 Hz
     delay(250);     // Continue for 0.25 seconds
-    noTone(8);      // Stop the tone
+    noTone(6);      // Stop the tone
 }
 
 void playSuccessSound() {
-  tone(8, 1000);  // Play tone at 1000 Hz
+  tone(6, 1000);  // Play tone at 1000 Hz
   delay(150);     // Continue for 0.75 seconds
-  tone(8, 1200);  // Play tone at 1000 Hz
+  tone(6, 1200);  // Play tone at 1000 Hz
   delay(150);
-  tone(8, 1400);
+  tone(6, 1400);
   delay(150);
-  noTone(8);
+  noTone(6);
 }
 
 void playSetupCompleteSound() {
+  digitalWrite(redPin, LOW);
+  digitalWrite(greenPin, HIGH);
+  digitalWrite(bluePin, LOW);
   // Play a simple ascending tone sequence to indicate completion
-  tone(8, 800);   // Play tone at 800 Hz
+  tone(6, 800);   // Play tone at 800 Hz
   delay(150);     // Continue for 0.2 seconds
-  tone(8, 1000);  // Increase tone to 1000 Hz
+  tone(6, 1000);  // Increase tone to 1000 Hz
   delay(150);     // Continue for 0.2 seconds
-  tone(8, 1200);  // Increase tone further to 1200 Hz
+  tone(6, 1200);  // Increase tone further to 1200 Hz
   delay(150);     // Continue for 0.2 seconds
-  noTone(8);      // Stop the tone
+  noTone(6);      // Stop the tone
 
   // Add a short pause
   delay(150);
 
   // Play a final high tone to definitively signal readiness
-  tone(8, 1500);  // Play a higher tone at 1500 Hz
+  tone(6, 1500);  // Play a higher tone at 1500 Hz
   delay(300);     // Continue for 0.3 seconds
-  noTone(8);      // Stop the tone
+  noTone(6);      // Stop the tone
 }
