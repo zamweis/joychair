@@ -15,9 +15,6 @@ bool checkTilt(float pitch, float roll, float tolerance);
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
 
-long previousMillis = 0;  // will store last time LED was updated
-long interval = 250;  // interval at which to blink (milliseconds)
-
 Quaternion q;
 VectorFloat gravity;
 float ypr[3];  // yaw, pitch, roll
@@ -45,14 +42,13 @@ int joystickRz;
 int jumpThreshold = 800;
 int buzzerPin = 6;
 
-bool calibrationComplete = false;
-bool tiltCheckComplete = false;
+bool forwardDirectionDefined = false;
+bool sittingCheckComplete = false;
 float calibrationYaw, calibrationPitch, calibrationRoll;
-unsigned long calibrationStartTime;
-unsigned long tiltCheckStartTime;
+unsigned long lastTiltCheckTime = 0;
 const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
-const unsigned long tiltCheckDuration = 3000; // Duration to check for tilt in milliseconds
 const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
+const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting down
 
 void setup() {
   Serial.begin(115200);
@@ -60,7 +56,7 @@ void setup() {
   playInitSound();
   Serial.println("Initializing...");
 
-  pinMode(buzzerPin, OUTPUT);      // Set digital pin as an OUTPUT for buzzer 
+  pinMode(buzzerPin, OUTPUT); // Set digital pin as an OUTPUT for buzzer 
   Joystick.begin(false);
 
   // Initialize MPU6050
@@ -86,9 +82,11 @@ void setup() {
 
   mpu.CalibrateAccel();
   mpu.CalibrateGyro();
-  
+  Serial.println("Calibration complete!");
   playSuccessSound();
-  tiltCheckStartTime = millis();
+  delay(1000);
+  Serial.println("Waiting for player to sit down...");
+  playInitSound();
 }
 
 void loop() {
@@ -108,54 +106,58 @@ void loop() {
     yaw = ypr[0] * 180/M_PI;
     pitch = ypr[1] * 180/M_PI;
     roll = ypr[2] * 180/M_PI;
-
-    if (!tiltCheckComplete) {
-      if (checkTilt(pitch, roll, tiltTolerance)) {
-        if (currentMillis - tiltCheckStartTime >= tiltCheckDuration) {
-          tiltCheckComplete = true;
-          calibrationStartTime = millis();
-          playInitSound();
-          Serial.println("Tilt check complete. Starting calibration...");
-        }
-      } else {
-        tiltCheckStartTime = millis();
+    
+    // Wait for player to sit down
+    if (!sittingCheckComplete) {
+      if (accelZ > sittingAccelZThreshold) {
+        playSuccessSound();
+        sittingCheckComplete = true;
+        Serial.println("Player detected.");
+        Serial.println("Tilt forward and hold for a few seconds...");
       }
       return;
     }
 
-    if (!calibrationComplete) {
-      if (currentMillis - calibrationStartTime >= calibrationDuration) {
-        calibrationYaw = yaw;
-        calibrationPitch = pitch;
-        calibrationRoll = roll;
-        calibrationComplete = true;
-        playSetupCompleteSound();
-        Serial.println("Calibration complete!");
-        Serial.print("Calibration yaw: "); Serial.println(calibrationYaw);
-        Serial.print("Calibration pitch: "); Serial.println(calibrationPitch);
-        Serial.print("Calibration roll: "); Serial.println(calibrationRoll);
-      }
-      return;
+    // Check for uninterrupted tilt lasting 5
+    if (!forwardDirectionDefined) {
+        if (checkTilt(pitch, roll, tiltTolerance)) {
+          if (lastTiltCheckTime == 0) {
+            lastTiltCheckTime = millis(); // Start timing if the tilt is sufficient
+            playInitSound();
+          } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
+            calibrationYaw = yaw;
+            calibrationPitch = pitch;
+            calibrationRoll = roll;
+            forwardDirectionDefined = true;
+            playSetupCompleteSound();
+            Serial.println("Forward direction defined!");
+            Serial.println("Setup Complete!");
+          }
+        } else {
+          if (lastTiltCheckTime != 0) { // Play error sound only once
+            playErrorSound();
+          }
+          lastTiltCheckTime = 0; // Reset timing if the tilt is not sufficient
+        }
+        return;
     }
 
     // Adjust the angles based on calibration
     float adjustedYaw = yaw - calibrationYaw;
-    float adjustedPitch = pitch;
-    float adjustedRoll = roll;
 
     // Apply the rotation matrix based on calibration (if necessary)
-    float tempX = adjustedRoll * cos(calibrationYaw) - adjustedPitch * sin(calibrationYaw);
-    float tempY = adjustedRoll * sin(calibrationYaw) + adjustedPitch * cos(calibrationYaw);
-    adjustedRoll = tempX;
-    adjustedPitch = tempY;
+    float tempX = roll * cos(calibrationYaw) - pitch * sin(calibrationYaw);
+    float tempY = roll * sin(calibrationYaw) + pitch * cos(calibrationYaw);
+    roll = tempX;
+    pitch = tempY;
 
     // Linearly map angles and accelerations to joystick ranges
-    joystickX = map(adjustedRoll, -45, 45, 0, 1023);
+    joystickX = map(roll, -45, 45, 0, 1023);
+    joystickY = map(pitch, -45, 45, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
-    joystickRx = map(adjustedPitch, -90, 90, 0, 1023);
-    joystickRy = map(adjustedYaw, -180, 180, 0, 1023) + 11; // Sensor got error of 14
-    joystickRz = map(adjustedRoll, -90, 90, 0, 1023);
-    joystickY = map(adjustedPitch, -45, 45, 0, 1023);
+    joystickRx = map(pitch, -90, 90, 0, 1023);
+    joystickRy = map(adjustedYaw, -180, 180, 0, 1023) + 11; // Sensor got error of 11
+    joystickRz = map(roll, -90, 90, 0, 1023);
 
     // Deadzones for X-and Y-Axis
     joystickX = applyDeadzone(joystickX, 11);
