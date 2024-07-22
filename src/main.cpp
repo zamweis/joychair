@@ -10,6 +10,7 @@ void playErrorSound();
 void printRollPitchYawAccelZ();
 void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
+bool checkTilt(float pitch, float roll, float tolerance);
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -42,15 +43,24 @@ int joystickRy;
 int joystickRz;
 
 int jumpThreshold = 800;
-int buzzerPin = 6;  
+int buzzerPin = 6;
+
+bool calibrationComplete = false;
+bool tiltCheckComplete = false;
+float calibrationYaw, calibrationPitch, calibrationRoll;
+unsigned long calibrationStartTime;
+unsigned long tiltCheckStartTime;
+const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
+const unsigned long tiltCheckDuration = 3000; // Duration to check for tilt in milliseconds
+const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
 
 void setup() {
+  Serial.begin(115200);
+  Wire.begin();
   playInitSound();
   Serial.println("Initializing...");
 
   pinMode(buzzerPin, OUTPUT);      // Set digital pin as an OUTPUT for buzzer 
-  Serial.begin(115200);
-  Wire.begin();
   Joystick.begin(false);
 
   // Initialize MPU6050
@@ -77,9 +87,9 @@ void setup() {
   mpu.CalibrateAccel();
   mpu.CalibrateGyro();
   
-  playSetupCompleteSound();
+  playSuccessSound();
+  tiltCheckStartTime = millis();
 }
-
 
 void loop() {
   long currentMillis = millis();
@@ -99,14 +109,53 @@ void loop() {
     pitch = ypr[1] * 180/M_PI;
     roll = ypr[2] * 180/M_PI;
 
+    if (!tiltCheckComplete) {
+      if (checkTilt(pitch, roll, tiltTolerance)) {
+        if (currentMillis - tiltCheckStartTime >= tiltCheckDuration) {
+          tiltCheckComplete = true;
+          calibrationStartTime = millis();
+          playInitSound();
+          Serial.println("Tilt check complete. Starting calibration...");
+        }
+      } else {
+        tiltCheckStartTime = millis();
+      }
+      return;
+    }
+
+    if (!calibrationComplete) {
+      if (currentMillis - calibrationStartTime >= calibrationDuration) {
+        calibrationYaw = yaw;
+        calibrationPitch = pitch;
+        calibrationRoll = roll;
+        calibrationComplete = true;
+        playSetupCompleteSound();
+        Serial.println("Calibration complete!");
+        Serial.print("Calibration yaw: "); Serial.println(calibrationYaw);
+        Serial.print("Calibration pitch: "); Serial.println(calibrationPitch);
+        Serial.print("Calibration roll: "); Serial.println(calibrationRoll);
+      }
+      return;
+    }
+
+    // Adjust the angles based on calibration
+    float adjustedYaw = yaw - calibrationYaw;
+    float adjustedPitch = pitch;
+    float adjustedRoll = roll;
+
+    // Apply the rotation matrix based on calibration (if necessary)
+    float tempX = adjustedRoll * cos(calibrationYaw) - adjustedPitch * sin(calibrationYaw);
+    float tempY = adjustedRoll * sin(calibrationYaw) + adjustedPitch * cos(calibrationYaw);
+    adjustedRoll = tempX;
+    adjustedPitch = tempY;
 
     // Linearly map angles and accelerations to joystick ranges
-    joystickX = map(roll, -45, 45, 0, 1023);
+    joystickX = map(adjustedRoll, -45, 45, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
-    joystickRx = map(pitch, -90, 90, 0, 1023);
-    joystickRy = map(yaw, -180, 180, 0, 1023)+11; // Sensor got error of 14
-    joystickRz = map(roll, -90, 90, 0, 1023);
-    joystickY = map(pitch, -45, 45, 0, 1023);
+    joystickRx = map(adjustedPitch, -90, 90, 0, 1023);
+    joystickRy = map(adjustedYaw, -180, 180, 0, 1023) + 11; // Sensor got error of 14
+    joystickRz = map(adjustedRoll, -90, 90, 0, 1023);
+    joystickY = map(adjustedPitch, -45, 45, 0, 1023);
 
     // Deadzones for X-and Y-Axis
     joystickX = applyDeadzone(joystickX, 11);
@@ -145,11 +194,15 @@ int applyDeadzone(int value, int deadzone) {
     }
 }
 
+bool checkTilt(float pitch, float roll, float tolerance) {
+  return (abs(pitch) > tolerance || abs(roll) > tolerance);
+}
+
 void printRollPitchYawAccelZ() {
   Serial.print(F("roll: ")); Serial.print(roll);
   Serial.print(F(", pitch: ")); Serial.print(pitch);
   Serial.print(F(", yaw: ")); Serial.print(yaw);  
-  Serial.print(F(", accelZ: ")); Serial.print(accelZ);
+  Serial.print(F(", accelZ: ")); Serial.println(accelZ);
 }
 
 void printJoystickValues(){
@@ -162,7 +215,6 @@ void printJoystickValues(){
 }
 
 void playInitSound() {
-  // Buzzer
   tone(buzzerPin, 1000);  // Play tone at 1000 Hz
   delay(150);     // Continue for 1 second
   noTone(buzzerPin);      // Stop the tone
@@ -173,14 +225,14 @@ void playInitSound() {
 }
 
 void playErrorSound() {
-    // Buzzer emits a distinct error sound, using a lower tone
-    tone(buzzerPin, 500);   // Play tone at 500 Hz
-    delay(250);     // Continue for 0.25 seconds
-    noTone(buzzerPin);      // Stop the tone
-    delay(100);     // Short pause
-    tone(buzzerPin, 500);   // Repeat tone at 500 Hz
-    delay(250);     // Continue for 0.25 seconds
-    noTone(buzzerPin);      // Stop the tone
+  // Buzzer emits a distinct error sound, using a lower tone
+  tone(buzzerPin, 500);   // Play tone at 500 Hz
+  delay(250);     // Continue for 0.25 seconds
+  noTone(buzzerPin);      // Stop the tone
+  delay(100);     // Short pause
+  tone(buzzerPin, 500);   // Repeat tone at 500 Hz
+  delay(250);     // Continue for 0.25 seconds
+  noTone(buzzerPin);      // Stop the tone
 }
 
 void playSuccessSound() {
