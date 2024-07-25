@@ -52,8 +52,6 @@ int buzzerPin = 6;
 
 bool forwardDirectionDefined = false;
 bool sittingCheckComplete = false;
-float calibrationYaw, calibrationPitch, calibrationRoll;
-float forwardPitch, forwardRoll;
 unsigned long lastTiltCheckTime = 0;
 const unsigned long calibrationDuration = 5000; // Kalibrierdauer in Millisekunden
 const float tiltTolerance = 10.0; // Toleranz für die Neigungsprüfung in Grad
@@ -159,22 +157,21 @@ void loop() {
     float cosAngle = cos(radAngle);
     float sinAngle = sin(radAngle);
 
-    // Drehung der Yaw-, Pitch- und Roll-Werte entsprechend des relativen Winkels
-    float newYaw = yaw * cosAngle - pitch * sinAngle;
-    float newPitch = yaw * sinAngle + pitch * cosAngle;
-    float newRoll = roll; // Roll wird durch die Yaw-Pitch-Drehung nicht direkt beeinflusst
+    // Drehung der Roll- und Pitch-Werte entsprechend des relativen Winkels
+    float newRoll = roll * cosAngle - pitch * sinAngle;
+    float newPitch = roll * sinAngle + pitch * cosAngle;
 
-    // Korrekte Zuordnung der neuen Yaw- und Pitch-Werte zu den Joystick-Achsen
+    // Korrekte Zuordnung der neuen Roll- und Pitch-Werte zu den Joystick-Achsen
     joystickX = map(newRoll, -90, 90, 0, 1023);
     joystickY = map(newPitch, -90, 90, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
     joystickRx = map(newRoll, -90, 90, 0, 1023);
-    joystickRy = map(newYaw, -180, 180, 0, 1023);
+    joystickRy = map(newPitch, -90, 90, 0, 1023);
     joystickRz = map(yaw, -180, 180, 0, 1023); // Verwenden von Yaw für Rz
     
     // Deadzones für X- und Y-Achse
-    joystickX = applyDeadzone(joystickX, 11);
-    joystickY = applyDeadzone(joystickY, 11);
+    //joystickX = applyDeadzone(joystickX, 11);
+    //joystickY = applyDeadzone(joystickY, 11);
 
     Joystick.setXAxis(joystickX);
     Joystick.setYAxis(joystickY);
