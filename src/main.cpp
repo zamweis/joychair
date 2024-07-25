@@ -116,6 +116,7 @@ void loop() {
     pitch = ypr[1] * 180/M_PI;
     roll = ypr[2] * 180/M_PI;
     
+    Serial.println(calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ()));
     // Warten, bis der Spieler sitzt
     if (!sittingCheckComplete) {
       if (accelZ > sittingAccelZThreshold) {
@@ -135,7 +136,7 @@ void loop() {
             playInitSound();
           } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
             // Berechnung des relativen Winkels
-            relativeAngle = calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
+            relativeAngle = -calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
             Serial.print("Relative Angle: ");
             Serial.println(relativeAngle);
 
@@ -153,13 +154,12 @@ void loop() {
         return;
     }
     
-    float radAngle = relativeAngle * M_PI / 180.0;
-    float cosAngle = cos(radAngle);
-    float sinAngle = sin(radAngle);
+    float cosAngle = -cos(relativeAngle);
+    float sinAngle = -sin(relativeAngle);
 
     // Drehung der Roll- und Pitch-Werte entsprechend des relativen Winkels
-    float newRoll = roll * cosAngle - pitch * sinAngle;
-    float newPitch = roll * sinAngle + pitch * cosAngle;
+    float newRoll = pitch * sinAngle + roll * cosAngle;
+    float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Korrekte Zuordnung der neuen Roll- und Pitch-Werte zu den Joystick-Achsen
     joystickX = map(newRoll, -90, 90, 0, 1023);
@@ -170,8 +170,8 @@ void loop() {
     joystickRz = map(yaw, -180, 180, 0, 1023); // Verwenden von Yaw für Rz
     
     // Deadzones für X- und Y-Achse
-    //joystickX = applyDeadzone(joystickX, 11);
-    //joystickY = applyDeadzone(joystickY, 11);
+    joystickX = applyDeadzone(joystickX, 11);
+    joystickY = applyDeadzone(joystickY, 11);
 
     Joystick.setXAxis(joystickX);
     Joystick.setYAxis(joystickY);
@@ -218,17 +218,9 @@ float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
   float proj_y = accelY;
   
   // Berechnung des Winkels in der XY-Ebene zur Vorwärtsrichtung (positive y-Achse)
-  float angle = atan2(proj_x, proj_y);
+  float angle = atan2(proj_y, proj_x);
   
-  // Umwandlung von Bogenmaß in Grad
-  float angle_degrees = angle * 180 / M_PI;
-  
-  // Winkel in den Bereich [0, 360] bringen
-  if (angle_degrees < 0) {
-    angle_degrees += 360;
-  }
-  
-  return angle_degrees;
+  return angle;
 }
 
 bool checkTilt(float pitch, float roll, float tolerance) {
