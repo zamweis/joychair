@@ -3,6 +3,7 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 
+// Deklarationen der Funktionen und Variablen
 void playInitSound();
 void playSuccessSound();
 void playSetupCompleteSound();
@@ -11,6 +12,7 @@ void printRollPitchYawAccelZ();
 void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
 bool checkTilt(float pitch, float roll, float tolerance);
+float calculateRelativeAngle(float accelX, float accelY, float accelZ);
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -21,16 +23,19 @@ float ypr[3];  // yaw, pitch, roll
 float yaw;
 float pitch;
 float roll;
+float accelX;
+float accelY;
 float accelZ;
+float relativeAngle; // Winkel zur Drehung des Sensors
 
 MPU6050 mpu;
 
 Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
-                   1, 0,                   // Button Count, Hat Switch Count
-                   true, true, true,       // X and Y, and Z Axis
-                   true, true, true,       // Rx, Ry, and Rz
-                   false, false,           // rudder and throttle
-                   false, false, false);   // accelerator, brake, and steering
+                   1, 0,                   // Anzahl der Buttons, Hat Switch Count
+                   true, true, true,       // X und Y, und Z Achse
+                   true, true, true,       // Rx, Ry und Rz
+                   false, false,           // Ruder und Gashebel
+                   false, false, false);   // Beschleuniger, Bremse und Steuerung
 
 int joystickX;
 int joystickY;
@@ -39,16 +44,20 @@ int joystickRx;
 int joystickRy;
 int joystickRz;
 
+float cosAngle;
+float sinAngle;
+
 int jumpThreshold = 800;
 int buzzerPin = 6;
 
 bool forwardDirectionDefined = false;
 bool sittingCheckComplete = false;
 float calibrationYaw, calibrationPitch, calibrationRoll;
+float forwardPitch, forwardRoll;
 unsigned long lastTiltCheckTime = 0;
-const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
-const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
-const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting down
+const unsigned long calibrationDuration = 5000; // Kalibrierdauer in Millisekunden
+const float tiltTolerance = 10.0; // Toleranz für die Neigungsprüfung in Grad
+const float sittingAccelZThreshold = 4000; // Schwellenwert für das Erkennen des Sitzens
 
 void setup() {
   Serial.begin(115200);
@@ -56,10 +65,10 @@ void setup() {
   playInitSound();
   Serial.println("Initializing...");
 
-  pinMode(buzzerPin, OUTPUT); // Set digital pin as an OUTPUT for buzzer 
+  pinMode(buzzerPin, OUTPUT); // Setzen des digitalen Pins als Ausgang für den Summer
   Joystick.begin(false);
 
-  // Initialize MPU6050
+  // Initialisieren des MPU6050
   mpu.initialize();
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection failed!");
@@ -67,7 +76,7 @@ void setup() {
     while (1);
   }
   
-  // Initialize DMP
+  // Initialisieren des DMP
   uint8_t devStatus = mpu.dmpInitialize();
   if (devStatus == 0) {
     mpu.setDMPEnabled(true);
@@ -91,23 +100,25 @@ void setup() {
 
 void loop() {
   long currentMillis = millis();
-  // Check if there's new data from the DMP
+  // Prüfen, ob neue Daten vom DMP vorliegen
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-    // Get the quaternion data
+    // Holen der Quaternion-Daten
     mpu.dmpGetQuaternion(&q, fifoBuffer);
-    // Get the gravity vector
+    // Holen des Schwerkraftvektors
     mpu.dmpGetGravity(&gravity, &q);
-    // Get yaw, pitch, and roll
+    // Holen von Yaw, Pitch und Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
+    accelX = mpu.getAccelerationX();
+    accelY = mpu.getAccelerationY();
     accelZ = mpu.getAccelerationZ() - 16383; 
 
-    // Convert to degrees
+    // Umrechnung in Grad
     yaw = ypr[0] * 180/M_PI;
     pitch = ypr[1] * 180/M_PI;
     roll = ypr[2] * 180/M_PI;
     
-    // Wait for player to sit down
+    // Warten, bis der Spieler sitzt
     if (!sittingCheckComplete) {
       if (accelZ > sittingAccelZThreshold) {
         playSuccessSound();
@@ -118,48 +129,50 @@ void loop() {
       return;
     }
 
-    // Check for uninterrupted tilt lasting 5
+    // Prüfen auf ununterbrochene Neigung von 5 Sekunden
     if (!forwardDirectionDefined) {
         if (checkTilt(pitch, roll, tiltTolerance)) {
           if (lastTiltCheckTime == 0) {
-            lastTiltCheckTime = millis(); // Start timing if the tilt is sufficient
+            lastTiltCheckTime = millis(); // Starten der Zeitmessung, wenn die Neigung ausreichend ist
             playInitSound();
           } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
-            calibrationYaw = yaw;
-            calibrationPitch = pitch;
-            calibrationRoll = roll;
+            // Berechnung des relativen Winkels
+            relativeAngle = calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
+            Serial.print("Relative Angle: ");
+            Serial.println(relativeAngle);
+
             forwardDirectionDefined = true;
             playSetupCompleteSound();
             Serial.println("Forward direction defined!");
             Serial.println("Setup Complete!");
           }
         } else {
-          if (lastTiltCheckTime != 0) { // Play error sound only once
+          if (lastTiltCheckTime != 0) { // Fehlergeräusch nur einmal abspielen
             playErrorSound();
           }
-          lastTiltCheckTime = 0; // Reset timing if the tilt is not sufficient
+          lastTiltCheckTime = 0; // Zurücksetzen der Zeitmessung, wenn die Neigung nicht ausreichend ist
         }
         return;
     }
+    
+    float radAngle = relativeAngle * M_PI / 180.0;
+    float cosAngle = cos(radAngle);
+    float sinAngle = sin(radAngle);
 
-    // Adjust the angles based on calibration
-    float adjustedYaw = yaw - calibrationYaw;
+    // Drehung der Yaw-, Pitch- und Roll-Werte entsprechend des relativen Winkels
+    float newYaw = yaw * cosAngle - pitch * sinAngle;
+    float newPitch = yaw * sinAngle + pitch * cosAngle;
+    float newRoll = roll; // Roll wird durch die Yaw-Pitch-Drehung nicht direkt beeinflusst
 
-    // Apply the rotation matrix based on calibration (if necessary)
-    float tempX = roll * cos(calibrationYaw) - pitch * sin(calibrationYaw);
-    float tempY = roll * sin(calibrationYaw) + pitch * cos(calibrationYaw);
-    roll = tempX;
-    pitch = tempY;
-
-    // Linearly map angles and accelerations to joystick ranges
-    joystickX = map(roll, -45, 45, 0, 1023);
-    joystickY = map(pitch, -45, 45, 0, 1023);
+    // Korrekte Zuordnung der neuen Yaw- und Pitch-Werte zu den Joystick-Achsen
+    joystickX = map(newRoll, -90, 90, 0, 1023);
+    joystickY = map(newPitch, -90, 90, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
-    joystickRx = map(pitch, -90, 90, 0, 1023);
-    joystickRy = map(adjustedYaw, -180, 180, 0, 1023) + 11; // Sensor got error of 11
-    joystickRz = map(roll, -90, 90, 0, 1023);
-
-    // Deadzones for X-and Y-Axis
+    joystickRx = map(newRoll, -90, 90, 0, 1023);
+    joystickRy = map(newYaw, -180, 180, 0, 1023);
+    joystickRz = map(yaw, -180, 180, 0, 1023); // Verwenden von Yaw für Rz
+    
+    // Deadzones für X- und Y-Achse
     joystickX = applyDeadzone(joystickX, 11);
     joystickY = applyDeadzone(joystickY, 11);
 
@@ -177,23 +190,48 @@ void loop() {
       Joystick.setButton(0, 0);
     }
 
-    Joystick.sendState(); // Send the updated state to the host
+    Joystick.sendState(); // Senden des aktualisierten Zustands an den Host
   }
 }
 
 int applyDeadzone(int value, int deadzone) {
-    // Calculate the center point of the output range
-    const int center = 511;  // Center for the range [0, 1023]
+    // Berechnung des Mittelpunktes des Ausgabebereichs
+    const int center = 511;  // Mittelpunkt für den Bereich [0, 1023]
     int distance = value - center;
     
-    // If the distance from center is less than the deadzone, set output to center
+    // Wenn der Abstand vom Mittelpunkt kleiner als die Deadzone ist, den Ausgang auf den Mittelpunkt setzen
     if (abs(distance) < deadzone) {
         return center;
     } else {
-        // If outside the deadzone, adjust the value linearly from the edge of the deadzone
+        // Wenn außerhalb der Deadzone, den Wert linear vom Rand der Deadzone anpassen
         return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) : 
                                 map(distance, -511, -deadzone, 0, center - deadzone);
     }
+}
+
+float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
+  // Normalisieren der Beschleunigungswerte
+  float norm = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+  accelX /= norm;
+  accelY /= norm;
+  accelZ /= norm;
+  
+  // Berechnung der Projektion auf die XY-Ebene (Bodenprojektion)
+  float proj_x = accelX;
+  float proj_y = accelY;
+  
+  // Berechnung des Winkels in der XY-Ebene zur Vorwärtsrichtung (positive y-Achse)
+  float angle = atan2(proj_x, proj_y);
+  
+  // Umwandlung von Bogenmaß in Grad
+  float angle_degrees = angle * 180 / M_PI;
+  
+  // Winkel in den Bereich [0, 360] bringen
+  if (angle_degrees < 0) {
+    angle_degrees += 360;
+  }
+  
+  return angle_degrees;
 }
 
 bool checkTilt(float pitch, float roll, float tolerance) {
@@ -217,9 +255,9 @@ void printJoystickValues(){
 }
 
 void playInitSound() {
-  tone(buzzerPin, 1000);  // Play tone at 1000 Hz
-  delay(150);     // Continue for 1 second
-  noTone(buzzerPin);      // Stop the tone
+  tone(buzzerPin, 1000);  // Ton bei 1000 Hz abspielen
+  delay(150);     // Fortsetzen für 1 Sekunde
+  noTone(buzzerPin);      // Ton stoppen
   delay(150);
   tone(buzzerPin, 1000);
   delay(150);
@@ -227,20 +265,20 @@ void playInitSound() {
 }
 
 void playErrorSound() {
-  // Buzzer emits a distinct error sound, using a lower tone
-  tone(buzzerPin, 500);   // Play tone at 500 Hz
-  delay(250);     // Continue for 0.25 seconds
-  noTone(buzzerPin);      // Stop the tone
-  delay(100);     // Short pause
-  tone(buzzerPin, 500);   // Repeat tone at 500 Hz
-  delay(250);     // Continue for 0.25 seconds
-  noTone(buzzerPin);      // Stop the tone
+  // Der Summer gibt ein deutliches Fehlergeräusch von sich, indem ein tieferer Ton verwendet wird
+  tone(buzzerPin, 500);   // Ton bei 500 Hz abspielen
+  delay(250);     // Fortsetzen für 0,25 Sekunden
+  noTone(buzzerPin);      // Ton stoppen
+  delay(100);     // Kurze Pause
+  tone(buzzerPin, 500);   // Ton bei 500 Hz wiederholen
+  delay(250);     // Fortsetzen für 0,25 Sekunden
+  noTone(buzzerPin);      // Ton stoppen
 }
 
 void playSuccessSound() {
-  tone(buzzerPin, 1000);  // Play tone at 1000 Hz
-  delay(150);     // Continue for 0.75 seconds
-  tone(buzzerPin, 1200);  // Play tone at 1000 Hz
+  tone(buzzerPin, 1000);  // Ton bei 1000 Hz abspielen
+  delay(150);     // Fortsetzen für 0,75 Sekunden
+  tone(buzzerPin, 1200);  // Ton bei 1000 Hz abspielen
   delay(150);
   tone(buzzerPin, 1400);
   delay(150);
@@ -248,20 +286,20 @@ void playSuccessSound() {
 }
 
 void playSetupCompleteSound() {
-  // Play a simple ascending tone sequence to indicate completion
-  tone(buzzerPin, 800);   // Play tone at 800 Hz
-  delay(150);     // Continue for 0.2 seconds
-  tone(buzzerPin, 1000);  // Increase tone to 1000 Hz
-  delay(150);     // Continue for 0.2 seconds
-  tone(buzzerPin, 1200);  // Increase tone further to 1200 Hz
-  delay(150);     // Continue for 0.2 seconds
-  noTone(buzzerPin);      // Stop the tone
+  // Einfachen aufsteigenden Ton abspielen, um die Fertigstellung anzuzeigen
+  tone(buzzerPin, 800);   // Ton bei 800 Hz abspielen
+  delay(150);     // Fortsetzen für 0,2 Sekunden
+  tone(buzzerPin, 1000);  // Ton auf 1000 Hz erhöhen
+  delay(150);     // Fortsetzen für 0,2 Sekunden
+  tone(buzzerPin, 1200);  // Ton weiter auf 1200 Hz erhöhen
+  delay(150);     // Fortsetzen für 0,2 Sekunden
+  noTone(buzzerPin);      // Ton stoppen
 
-  // Add a short pause
+  // Kurze Pause einlegen
   delay(150);
 
-  // Play a final high tone to definitively signal readiness
-  tone(buzzerPin, 1500);  // Play a higher tone at 1500 Hz
-  delay(300);     // Continue for 0.3 seconds
-  noTone(buzzerPin);      // Stop the tone
+  // Letzten hohen Ton abspielen, um die Bereitschaft endgültig zu signalisieren
+  tone(buzzerPin, 1500);  // Höheren Ton bei 1500 Hz abspielen
+  delay(300);     // Fortsetzen für 0,3 Sekunden
+  noTone(buzzerPin);      // Ton stoppen
 }
