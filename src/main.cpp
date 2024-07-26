@@ -116,7 +116,6 @@ void loop() {
     pitch = ypr[1] * 180/M_PI;
     roll = ypr[2] * 180/M_PI;
     
-    Serial.println(calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ()));
     // Warten, bis der Spieler sitzt
     if (!sittingCheckComplete) {
       if (accelZ > sittingAccelZThreshold) {
