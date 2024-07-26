@@ -13,6 +13,7 @@ void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
+void initializeMPU6050();
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -58,45 +59,33 @@ const float tiltTolerance = 10.0; // Toleranz für die Neigungsprüfung in Grad
 const float sittingAccelZThreshold = 4000; // Schwellenwert für das Erkennen des Sitzens
 
 void setup() {
+  playInitSound();
   Serial.begin(115200);
   Wire.begin();
-  playInitSound();
-  Serial.println("Initializing...");
-
   pinMode(buzzerPin, OUTPUT); // Setzen des digitalen Pins als Ausgang für den Summer
   Joystick.begin(false);
 
-  // Initialisieren des MPU6050
-  mpu.initialize();
-  if (!mpu.testConnection()) {
-    Serial.println("MPU6050 connection failed!");
-    playErrorSound();
-    while (1);
-  }
+  initializeMPU6050();
   
-  // Initialisieren des DMP
-  uint8_t devStatus = mpu.dmpInitialize();
-  if (devStatus == 0) {
-    mpu.setDMPEnabled(true);
-    packetSize = mpu.dmpGetFIFOPacketSize();
-    Serial.println("DMP ready!");
-  } else {
-    Serial.print("DMP Initialization failed (code ");
-    playErrorSound();
-    Serial.print(devStatus);
-    Serial.println(")");
-  }
-
-  mpu.CalibrateAccel();
-  mpu.CalibrateGyro();
-  Serial.println("Calibration complete!");
-  playSuccessSound();
-  delay(1000);
   Serial.println("Waiting for player to sit down...");
   playInitSound();
 }
 
 void loop() {
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 connection lost. Trying to reconnect...");
+    playErrorSound();
+    while (!mpu.testConnection()) {
+      delay(500);
+      Serial.print(".");
+      initializeMPU6050();
+    }
+    
+    initializeMPU6050();
+    Serial.println("MPU6050 reconnected.");
+    playSuccessSound();
+  }
+
   long currentMillis = millis();
   // Prüfen, ob neue Daten vom DMP vorliegen
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
@@ -188,6 +177,38 @@ void loop() {
 
     Joystick.sendState(); // Senden des aktualisierten Zustands an den Host
   }
+}
+
+void initializeMPU6050() {
+  //playInitSound();
+  Serial.println("Initializing...");
+
+  // Initialisieren des MPU6050
+  mpu.initialize();
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 connection failed!");
+    playErrorSound();
+    return;
+  }
+  
+  // Initialisieren des DMP
+  uint8_t devStatus = mpu.dmpInitialize();
+  if (devStatus == 0) {
+    mpu.setDMPEnabled(true);
+    packetSize = mpu.dmpGetFIFOPacketSize();
+    Serial.println("DMP ready!");
+  } else {
+    Serial.print("DMP Initialization failed (code ");
+    playErrorSound();
+    Serial.print(devStatus);
+    Serial.println(")");
+  }
+
+  mpu.CalibrateAccel();
+  mpu.CalibrateGyro();
+  Serial.println("Calibration complete!");
+  playSuccessSound();
+  delay(1000);
 }
 
 int applyDeadzone(int value, int deadzone) {
