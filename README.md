@@ -69,7 +69,9 @@ The code for this project performs several key functions:
 
 - [Aeris Swopper Product Page](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen): Learn more about the Aeris Swopper chair.
 - [Arduino Joystick Tutorial](https://www.instructables.com/Create-a-Joystick-Using-the-Arduino-Joystick-Libra/): Useful guide for setting up the Arduino Leonardo as a joystick.
-- [MPU6050](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to connect MPU6050
+- [MPU6050](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to wire MPU6050
+- [Buzzer](https://images.app.goo.gl/mgFJdeP5EhSxzM8t5): How to wire a buzzer
+- [RGB-LED](https://images.app.goo.gl/b1UZzW2y5GSzTEi26): How to wire a RGB-LED 
 
 ## Contributors
 
