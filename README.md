@@ -42,7 +42,7 @@ To set up the Joychair Interface project, follow these steps:
 2. **Arduino Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly/wired.
 3. **Unity Integration**: Import the output into Unity and configure the VR environment to respond to the chair's movements for navigation.
 
-4. **Optionally Casing**: For battery integration, follow the feather casing tutorial, CAD for esp32 in progress...
+4. **Optionally Casing**: For battery integration, follow recharable battery tutorial, CAD for esp32 in progress...
 
 ## Basic Functionality
 
