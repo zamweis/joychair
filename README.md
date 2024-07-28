@@ -17,6 +17,10 @@ The project was done with platformio plugin for vscode. The used libraries are a
 - JST-PH (Male)
 - JST-PH (Female)
 - JST-PH extension cable (optional but easier)
+- Buzzer (active or passive)
+- RGB-LED (optional LED)
+- MPU6050
+- Compatible microcontroller
 
 ### Hardware Setup
 
