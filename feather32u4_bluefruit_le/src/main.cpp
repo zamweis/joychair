@@ -83,85 +83,16 @@ Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_
 //                             BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 
-// MPU 
-MPU6050 mpu;
-Quaternion q;
-VectorFloat gravity;
-uint16_t packetSize;
-uint8_t fifoBuffer[64];
-float ypr[3];  // yaw, pitch, roll
-
 // LED 
 int redPin = 11;
 int greenPin = 10;
 int bluePin = 9;
 long previousMillis = 0;  // will store last time LED was updated
 long interval = 250;      // interval at which to blink (milliseconds)
-int16_t jumpThreshold = 800;
 
 int16_t joystickX;
 int16_t joystickY;
 int16_t joystickZ;
-
-void playInitSound() {
-  digitalWrite(redPin, HIGH);
-  digitalWrite(greenPin, HIGH);
-  digitalWrite(bluePin, LOW);
-  // Buzzer
-  tone(6, 1000);  // Play tone at 1000 Hz
-  delay(150);     // Continue for 1 second
-  noTone(6);      // Stop the tone
-  delay(150);
-  tone(6, 1000);
-  delay(150);
-  noTone(6);
-}
-
-void playErrorSound() {
-  digitalWrite(redPin, HIGH);
-  digitalWrite(greenPin, LOW);
-  digitalWrite(bluePin, LOW);
-  // Buzzer emits a distinct error sound, using a lower tone
-  tone(6, 500);  // Play tone at 500 Hz
-  delay(250);    // Continue for 0.25 seconds
-  noTone(6);     // Stop the tone
-  delay(100);    // Short pause
-  tone(6, 500);  // Repeat tone at 500 Hz
-  delay(250);    // Continue for 0.25 seconds
-  noTone(6);     // Stop the tone
-}
-
-void playSuccessSound() {
-  tone(6, 1000);  // Play tone at 1000 Hz
-  delay(150);     // Continue for 0.75 seconds
-  tone(6, 1200);  // Play tone at 1000 Hz
-  delay(150);
-  tone(6, 1400);
-  delay(150);
-  noTone(6);
-}
-
-void playSetupCompleteSound() {
-  digitalWrite(redPin, LOW);
-  digitalWrite(greenPin, HIGH);
-  digitalWrite(bluePin, LOW);
-  // Play a simple ascending tone sequence to indicate completion
-  tone(6, 800);   // Play tone at 800 Hz
-  delay(150);     // Continue for 0.2 seconds
-  tone(6, 1000);  // Increase tone to 1000 Hz
-  delay(150);     // Continue for 0.2 seconds
-  tone(6, 1200);  // Increase tone further to 1200 Hz
-  delay(150);     // Continue for 0.2 seconds
-  noTone(6);      // Stop the tone
-
-  // Add a short pause
-  delay(150);
-
-  // Play a final high tone to definitively signal readiness
-  tone(6, 1500);  // Play a higher tone at 1500 Hz
-  delay(300);     // Continue for 0.3 seconds
-  noTone(6);      // Stop the tone
-}
 
 
 // A small helper
@@ -171,24 +102,16 @@ void error(const __FlashStringHelper* err) {
     ;
 }
 
-
-/**************************************************************************/
-/*!
-    @brief  Sets up the HW an the BLE module (this function is called
-            automatically on startup)
-*/
-/**************************************************************************/
-void setup(void) {
-  //while (!Serial);  // required for Flora & Micro
-  
-  Wire.begin();
-  delay(500);
-
+void setup() {
+  playInitSound();
   Serial.begin(115200);
+  Wire.begin();
   Serial.println(F("Adafruit Bluefruit HID Gamepad"));
   Serial.println(F("---------------------------------------"));
+  pinMode(buzzerPin, OUTPUT); // Set digital pin as output for the buzzer
+  Joystick.begin(false);
 
-  // Set the RGB LED pins as output
+   // Set the RGB LED pins as output
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
@@ -196,37 +119,13 @@ void setup(void) {
   playInitSound();
   delay(1000);
 
-  // Initialize MPU6050
-  Serial.println("Initializing MPU6050...");
-  mpu.initialize();
-  if (!mpu.testConnection()) {
-    Serial.println("MPU6050 connection failed!");
-    playErrorSound();
-    while (1)
-      ;
+  if (!initializeMPU6050()) {
+    Serial.println("Failed to initialize MPU6050. Check connections and restart.");
+    while (true) {
+      playErrorSound();
+      delay(1000);
+    }
   }
-
-  // Initialize DMP
-  uint8_t devStatus = mpu.dmpInitialize();
-  if (devStatus == 0) {
-    mpu.setDMPEnabled(true);
-    packetSize = mpu.dmpGetFIFOPacketSize();
-    Serial.println("DMP ready!");
-  } else {
-    Serial.print("DMP Initialization failed (code ");
-    playErrorSound();
-    Serial.print(devStatus);
-    Serial.println(")");
-  }
-
-  mpu.CalibrateAccel();
-  mpu.CalibrateGyro();
-
-  delay(1000);
-  playSetupCompleteSound();
-
-  // Initialise the module
-  //Serial.print(F("Initialising the Bluefruit LE module: "));
 
   if (!ble.begin(VERBOSE_MODE)) {
     error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
@@ -272,6 +171,9 @@ void setup(void) {
   Serial.println(F("Go to your phone's Bluetooth settings to pair your device"));
   Serial.println(F("then open an application that accepts gamepad input"));
   Serial.println();
+
+  Serial.println("Waiting for player to sit down...");
+  playInitSound();
 }
 
 /**************************************************************************/
@@ -280,35 +182,120 @@ void setup(void) {
 */
 /**************************************************************************/
 void loop() {
-  // Check if there's new data from the DMP
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 connection lost. Trying to reconnect...");
+    playErrorSound();
+    unsigned long startAttemptTime = millis();
+    while (!mpu.testConnection() && millis() - startAttemptTime < 10000) { // 10 second timeout
+      delay(500);
+      Serial.print(".");
+      if (!mpuInitialized) {
+        initializeMPU6050();
+      }
+    }
+
+    if (mpu.testConnection()) {
+      Serial.println("MPU6050 reconnected.");
+      playSuccessSound();
+    } else {
+      Serial.println("Failed to reconnect MPU6050.");
+      playErrorSound();
+      delay(5000); // Wait 5 seconds before trying again
+      return; // Skip the rest of the loop if not reconnected
+    }
+  }
+
+  long currentMillis = millis();
+  // Check for new data from DMP
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-    // Get the quaternion data
+    // Get Quaternion data
     mpu.dmpGetQuaternion(&q, fifoBuffer);
-    // Get the gravity vector
+    // Get gravity vector
     mpu.dmpGetGravity(&gravity, &q);
-    // Get yaw, pitch, and roll
+    // Get Yaw, Pitch, and Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
-    float accelZ = mpu.getAccelerationZ() - 16383;
+    accelX = mpu.getAccelerationX();
+    accelY = mpu.getAccelerationY();
+    accelZ = mpu.getAccelerationZ() - 16383;
 
     // Convert to degrees
-    //float yaw = ypr[0] * 180 / M_PI;
-    float pitch = ypr[1] * 180 / M_PI;
-    float roll = ypr[2] * 180 / M_PI;
-    // Linearly map angles and accelerations to joystick ranges
+    yaw = ypr[0] * 180 / M_PI;
+    pitch = ypr[1] * 180 / M_PI;
+    roll = ypr[2] * 180 / M_PI;
+
+    // Wait for player to sit
+    if (!sittingCheckComplete) {
+      if (accelZ > sittingAccelZThreshold) {
+        playSuccessSound();
+        sittingCheckComplete = true;
+        Serial.println("Player detected.");
+        Serial.println("Tilt forward and hold for a few seconds...");
+      }
+      return;
+    }
+
+    // Check for continuous tilt of 5 seconds
+    if (!forwardDirectionDefined) {
+      if (checkTilt(pitch, roll, tiltTolerance)) {
+        if (lastTiltCheckTime == 0) {
+          lastTiltCheckTime = millis(); // Start timing when tilt is sufficient
+          playInitSound();
+        } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
+          // Calculate relative angle
+          relativeAngle = -calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
+          Serial.print("Relative Angle: ");
+          Serial.println(relativeAngle);
+
+          forwardDirectionDefined = true;
+          playSetupCompleteSound();
+          Serial.println("Forward direction defined!");
+          Serial.println("Setup Complete!");
+        }
+      } else {
+        if (lastTiltCheckTime != 0) { // Play error sound only once
+          playErrorSound();
+        }
+        lastTiltCheckTime = 0; // Reset timing if tilt is not sufficient
+      }
+      return;
+    }
+
+    float cosAngle = -cos(relativeAngle);
+    float sinAngle = -sin(relativeAngle);
+
+    // Rotate Roll and Pitch values according to the relative angle
+    float newRoll = pitch * sinAngle + roll * cosAngle;
+    float newPitch = pitch * cosAngle - roll * sinAngle;
+
+    // Map new Roll and Pitch values to joystick axes
+    joystickX = map(newRoll, -90, 90, 0, 1023);
+    joystickY = map(newPitch, -90, 90, 0, 1023);
+    joystickZ = map(accelZ, -32767, 32767, 0, 1023);
+    joystickRx = map(newRoll, -90, 90, 0, 1023);
+    joystickRy = map(newPitch, -90, 90, 0, 1023);
+    joystickRz = map(yaw, -180, 180, 0, 1023); // Use Yaw for Rz
+
+    // Apply deadzones to X and Y axes
+    joystickX = applyDeadzone(joystickX, 11);
+    joystickY = applyDeadzone(joystickY, 11);
+
+    Joystick.setXAxis(joystickX);
+    Joystick.setYAxis(joystickY);
+    Joystick.setZAxis(joystickZ);
+    Joystick.setRxAxis(joystickRx);
+    Joystick.setRyAxis(joystickRy);
+    Joystick.setRzAxis(joystickRz);
+
+    if (joystickZ > jumpThreshold) {
+      Joystick.setButton(0, 1);
+      Serial.println("Jump detected with height: " + String(joystickZ));
+    } else {
+      Joystick.setButton(0, 0);
+    }
+
+    Joystick.sendState(); // Send updated state to host
     
-     joystickX = map(roll, -90, 90, -32768, 32767);
-     joystickY = map(pitch, -90, 90, -32768, 32767);
-     joystickZ = accelZ;
-  }
-    /*
-    int16_t joystickRx = map(pitch, -90, 90, 0, 1023);
-    int16_t joystickRy = map(yaw, -180, 180, 0, 1023) + 11;  // Sensor got error of 14
-    int16_t joystickRz = map(roll, -90, 90, 0, 1023);
-*/
-    // Deadzones for X-and Y-Axis
-    //joystickX = applyDeadzone(roll, 11);
-   // joystickY = applyDeadzone(pitch, 11);
     int buttons = 0;
     if (joystickZ > jumpThreshold) {
       buttons = 1;
@@ -319,23 +306,143 @@ void loop() {
     String command = String("AT+BLEHIDGAMEPAD=") + String(joystickX) + "," + String(joystickY, DEC) + "," + String(buttons, HEX);
     Serial.println(command);
     ble.println(command);
-
-    // scaning period is 50 ms
-    delay(50);
-  
+  }
 }
 
+bool initializeMPU6050() {
+  Serial.println("Initializing...");
 
-int16_t applyDeadzone(int16_t value, int16_t deadzone) {
-  // Calculate the center point of the output range
-  const int16_t center = 511;  // Center for the range [0, 1023]
-  int16_t distance = value - center;
+  // Initialize MPU6050
+  mpu.initialize();
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 connection failed!");
+    playErrorSound();
+    mpuInitialized = false;
+    return false;
+  }
 
-  // If the distance from center is less than the deadzone, set output to center
+  // Initialize DMP
+  uint8_t devStatus = mpu.dmpInitialize();
+  if (devStatus == 0) {
+    mpu.setDMPEnabled(true);
+    packetSize = mpu.dmpGetFIFOPacketSize();
+    Serial.println("DMP ready!");
+    mpuInitialized = true;
+  } else {
+    Serial.print("DMP Initialization failed (code ");
+    playErrorSound();
+    Serial.print(devStatus);
+    Serial.println(")");
+    mpuInitialized = false;
+    return false;
+  }
+
+  mpu.CalibrateAccel();
+  mpu.CalibrateGyro();
+  Serial.println("Calibration complete!");
+  playSuccessSound();
+  delay(1000);
+  return true;
+}
+
+int applyDeadzone(int value, int deadzone) {
+  // Calculate center of output range
+  const int center = 511; // Center for range [0, 1023]
+  int distance = value - center;
+
+  // If the distance from the center is less than the deadzone, set output to center
   if (abs(distance) < deadzone) {
     return center;
   } else {
-    // If outside the deadzone, adjust the value linearly from the edge of the deadzone
-    return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) : map(distance, -511, -deadzone, 0, center - deadzone);
+    // If outside the deadzone, adjust value linearly from the edge of the deadzone
+    return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) :
+                            map(distance, -511, -deadzone, 0, center - deadzone);
   }
+}
+
+float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
+  // Normalize acceleration values
+  float norm = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+  accelX /= norm;
+  accelY /= norm;
+  accelZ /= norm;
+
+  // Calculate projection on XY-plane (ground projection)
+  float proj_x = accelX;
+  float proj_y = accelY;
+
+  // Calculate angle in XY-plane relative to forward direction (positive y-axis)
+  float angle = atan2(proj_y, proj_x);
+
+  return angle;
+}
+
+bool checkTilt(float pitch, float roll, float tolerance) {
+  return (abs(pitch) > tolerance || abs(roll) > tolerance);
+}
+
+void printRollPitchYawAccelZ() {
+  Serial.print(F("roll: ")); Serial.print(roll);
+  Serial.print(F(", pitch: ")); Serial.print(pitch);
+  Serial.print(F(", yaw: ")); Serial.print(yaw);
+  Serial.print(F(", accelZ: ")); Serial.println(accelZ);
+}
+
+void printJoystickValues(){
+  Serial.print(F("joystickX: ")); Serial.print(joystickX);
+  Serial.print(F(", joystickY: ")); Serial.print(joystickY);
+  Serial.print(F(", joystickZ: ")); Serial.print(joystickZ);
+  Serial.print(F(", joystickRx: ")); Serial.print(joystickRx);
+  Serial.print(F(", joystickRy: ")); Serial.print(joystickRy);
+  Serial.print(F(", joystickRz: ")); Serial.println(joystickRz);
+}
+
+void playInitSound() {
+  tone(buzzerPin, 1000);  // Play tone at 1000 Hz
+  delay(150); // Continue for 150 ms
+  noTone(buzzerPin); // Stop tone
+  delay(150);
+  tone(buzzerPin, 1000);
+  delay(150);
+  noTone(buzzerPin);
+}
+
+void playErrorSound() {
+  // The buzzer emits a distinct error sound by using a lower tone
+  tone(buzzerPin, 500); // Play tone at 500 Hz
+  delay(250); // Continue for 250 ms
+  noTone(buzzerPin); // Stop tone
+  delay(100); // Short pause
+  tone(buzzerPin, 500); // Repeat tone at 500 Hz
+  delay(250); // Continue for 250 ms
+  noTone(buzzerPin); // Stop tone
+}
+
+void playSuccessSound() {
+  tone(buzzerPin, 1000); // Play tone at 1000 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1200); // Increase tone to 1200 Hz
+  delay(150);
+  tone(buzzerPin, 1400);
+  delay(150);
+  noTone(buzzerPin);
+}
+
+void playSetupCompleteSound() {
+  // Play a simple ascending tone to indicate completion
+  tone(buzzerPin, 800); // Play tone at 800 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1000); // Increase tone to 1000 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1200); // Further increase tone to 1200 Hz
+  delay(150); // Continue for 150 ms
+  noTone(buzzerPin); // Stop tone
+
+  // Add a short pause
+  delay(150);
+
+  // Play final high tone to signal readiness
+  tone(buzzerPin, 1500); // Play higher tone at 1500 Hz
+  delay(300); // Continue for 300 ms
+  noTone(buzzerPin); // Stop tone
 }
