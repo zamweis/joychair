@@ -1,10 +1,10 @@
-# ChairIO Interface for VR Navigation - ESP32
+# Joychair Interface for VR Navigation - ESP32
 
-Welcome to the ChairIO Interface project for ESP32! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an ESP32 board. The ESP32 can transmit data over Bluetooth and wired connections.
+Welcome to the Joychair Interface project for ESP32! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an ESP32 board. The ESP32 can transmit data over Bluetooth and wired connections.
 
 ## Project Overview
 
-The ChairIO Interface captures the movements of the Aeris Swopper chair and integrates them directly into VR environments, particularly in Unity. This setup uses the ESP32 microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it wirelessly via Bluetooth or through a wired connection.
+The Joychair Interface captures the movements of the Aeris Swopper chair and integrates them directly into VR environments, particularly in Unity. This setup uses the ESP32 microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it wirelessly via Bluetooth or through a wired connection.
 
 ## Hardware Setup
 
