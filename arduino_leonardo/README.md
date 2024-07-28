@@ -15,9 +15,8 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 - **Aeris Swopper Chair**
 
 ### Casing
-
-3D-printed with a prusa MK2
-[Thingyverse](https://www.thingiverse.com/thing:628929)
+3D-printed with a prusa MK2  
+[Thingiverse](https://www.thingiverse.com/thing:628929) file  
 
 ### Wiring
 1. Connect the MPU6050 IMU to the Arduino Leonardo via I2C (SDA to A4, SCL to A5).
