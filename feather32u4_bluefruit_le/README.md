@@ -17,7 +17,7 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 
 ### Casing
 3D-printed with Prusa MK2  
-[Thingyverse](https://www.thingiverse.com/thing:2209964)  
+[Thingiverse](https://www.thingiverse.com/thing:2209964) file  
 [Additional Tutorial](https://www.thingiverse.com/thing:2209964) for accu/battery integration  
 
 ### Wiring
