@@ -1,3 +1,5 @@
+# Creating the improved README file content
+readme_content = """
 # Joychair - Interface for VR Navigation
 
 Welcome to the Joychair Interface project! This project aims to integrate the movements of an [Aeris Swopper chair](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen) into virtual reality (VR) environments, allowing users to navigate virtual worlds by shifting their weight on the chair. The idea behind this project is inspired by the concept of ChairIO, as described in the paper ["ChairIO - the Chair-Based Interface"](https://www.researchgate.net/publication/233819716_ChairIO--the_Chair-Based_Interface).
@@ -6,7 +8,7 @@ Welcome to the Joychair Interface project! This project aims to integrate the mo
 
 The Joychair Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems. The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
 
-The project was done with platformio plugin for vscode. The used libraries are also available for ArduinoIDE.  
+The project was done with PlatformIO plugin for VSCode. The used libraries are also available for ArduinoIDE.  
 
 ## Project Components
 
@@ -24,7 +26,7 @@ The project was done with platformio plugin for vscode. The used libraries are a
 
 ### Hardware Setup
 
-The project utilizes different microcontroller boards along with sensors, such as an Inertial Measurement Unit (IMU), attached to the chair. The IMU captures the chair's movements, which are then transmitted wirelessly/wired.
+The project utilizes different microcontroller boards along with sensors, such as an Inertial Measurement Unit (IMU), attached to the chair. The IMU captures the chair's movements, which are then transmitted wirelessly or via wired connections.
 
 - [Arduino Leonardo Setup](./arduino_leonardo)
 - [ESP32 Setup](./esp32)
@@ -39,56 +41,34 @@ In Unity, the output is used to control the user's movement within the VR enviro
 To set up the Joychair Interface project, follow these steps:
 
 1. **Hardware Setup**: Attach the IMU sensor to the Aeris Swopper chair as per the instructions provided.
-2. **Arduino Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly/wired.
+2. **Microcontroller Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly or via a wired connection.
 3. **Unity Integration**: Import the output into Unity and configure the VR environment to respond to the chair's movements for navigation.
-
-4. **Optionally Casing**: For battery integration, follow recharable battery tutorial, CAD for esp32 in progress...
+4. **Optional Casing**: For battery integration, follow a rechargeable battery tutorial. CAD for ESP32 is in progress.
 
 ## Basic Functionality
 
 The code for this project performs several key functions:
 
-1. **Initialization**: 
-   - Sets up the MPU6050 IMU and the joystick library.
-   - Plays an initialization sound.
-
-2. **Connection Check**:
-   - Continuously checks if the MPU6050 is connected.
-   - If the connection is lost, it tries to reconnect.
-
-3. **Data Processing**:
-   - Reads data from the IMU, calculates yaw, pitch, and roll.
-   - Maps these values to joystick axes.
-
-4. **Calibration and Direction Declaration**:
-   - Waits for the player to sit down by detecting a sufficient acceleration threshold.
-   - Once seated, the player is prompted to tilt forward for a few seconds to calibrate the forward direction.
-   - After holding the tilt for the calibration duration, the forward direction is defined.
-
-5. **Joystick Output**:
-   - Maps the processed data to joystick inputs for VR navigation.
-   - Applies deadzones to the joystick axes to filter out noise.
+1. **Initialization**: Sets up the MPU6050 IMU and the joystick library, and plays an initialization sound.
+2. **Connection Check**: Continuously checks if the MPU6050 is connected and tries to reconnect if the connection is lost.
+3. **Data Processing**: Reads data from the IMU, calculates yaw, pitch, and roll, and maps these values to joystick axes.
+4. **Calibration and Direction Declaration**: Waits for the player to sit down by detecting a sufficient acceleration threshold. Once seated, the player is prompted to tilt forward for a few seconds to calibrate the forward direction. After holding the tilt for the calibration duration, the forward direction is defined.
+5. **Joystick Output**: Maps the processed data to joystick inputs for VR navigation and applies deadzones to filter out noise.
 
 ### Calibration and Direction Declaration
 
-1. **Wait for Player to Sit**:
-   - The system waits until the acceleration in the Z-axis exceeds the sitting threshold.
-
-2. **Tilt Forward to Calibrate**:
-   - Once the player is seated, they are prompted to tilt forward and hold the position for a few seconds.
-   - If the tilt is held for the required calibration duration, the system calculates the relative angle and sets the forward direction.
-
-3. **Forward Direction Defined**:
-   - After successful calibration, the system plays a setup complete sound and indicates that the forward direction is defined.
+1. **Wait for Player to Sit**: The system waits until the acceleration in the Z-axis exceeds the sitting threshold.
+2. **Tilt Forward to Calibrate**: Once the player is seated, they are prompted to tilt forward and hold the position for a few seconds. If the tilt is held for the required calibration duration, the system calculates the relative angle and sets the forward direction.
+3. **Forward Direction Defined**: After successful calibration, the system plays a setup complete sound and indicates that the forward direction is defined.
 
 ## Additional Resources
 
 - [Aeris Swopper Product Page](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen): Learn more about the Aeris Swopper chair.
 - [Arduino Joystick Tutorial](https://www.instructables.com/Create-a-Joystick-Using-the-Arduino-Joystick-Libra/): Useful guide for setting up the Arduino Leonardo as a joystick.
-- [MPU6050](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to wire MPU6050
-- [Buzzer](https://images.app.goo.gl/mgFJdeP5EhSxzM8t5): How to wire a buzzer
-- [RGB-LED](https://images.app.goo.gl/b1UZzW2y5GSzTEi26): How to wire a RGB-LED
-- [Rechargeable Battery](https://learn.adafruit.com/3d-printed-case-for-adafruit-feather/assembly): How to wire a rechargeable battery  
+- [MPU6050 Wiring Guide](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to wire MPU6050
+- [Buzzer Wiring Guide](https://images.app.goo.gl/mgFJdeP5EhSxzM8t5): How to wire a buzzer
+- [RGB-LED Wiring Guide](https://images.app.goo.gl/b1UZzW2y5GSzTEi26): How to wire an RGB-LED
+- [Rechargeable Battery Integration](https://learn.adafruit.com/3d-printed-case-for-adafruit-feather/assembly): How to wire a rechargeable battery  
 
 ## Contributors
 
@@ -100,4 +80,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-Feel free to reach out to the project team for any questions or feedback. Happy navigating in VR with ChairIO Interface! 🎮🪑🌐
+Feel free to reach out to the project team for any questions or feedback. Happy navigating in VR with Joychair Interface! 🎮🪑🌐
+"""
