@@ -14,6 +14,11 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 - **Buzzer**
 - **Aeris Swopper Chair**
 
+### Casing
+
+3D-printed with a prusa MK2
+[Thingyverse](https://www.thingiverse.com/thing:628929)
+
 ### Wiring
 1. Connect the MPU6050 IMU to the Arduino Leonardo via I2C (SDA to A4, SCL to A5).
 2. Connect the buzzer to pin 6 of the Arduino Leonardo.
