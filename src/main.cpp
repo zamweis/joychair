@@ -3,7 +3,7 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 
-// Deklarationen der Funktionen und Variablen
+// Function and variable declarations
 void playInitSound();
 void playSuccessSound();
 void playSetupCompleteSound();
@@ -13,7 +13,7 @@ void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
-void initializeMPU6050();
+bool initializeMPU6050();
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -27,16 +27,16 @@ float roll;
 float accelX;
 float accelY;
 float accelZ;
-float relativeAngle; // Winkel zur Drehung des Sensors
+float relativeAngle; // Angle of sensor rotation
 
 MPU6050 mpu;
 
 Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
-                   1, 0,                   // Anzahl der Buttons, Hat Switch Count
-                   true, true, true,       // X und Y, und Z Achse
-                   true, true, true,       // Rx, Ry und Rz
-                   false, false,           // Ruder und Gashebel
-                   false, false, false);   // Beschleuniger, Bremse und Steuerung
+                   1, 0,                   // Number of buttons, Hat Switch Count
+                   true, true, true,       // X, Y, and Z axis
+                   true, true, true,       // Rx, Ry, and Rz
+                   false, false,           // Rudder and Throttle
+                   false, false, false);   // Accelerator, Brake, and Steering
 
 int joystickX;
 int joystickY;
@@ -53,20 +53,27 @@ int buzzerPin = 6;
 
 bool forwardDirectionDefined = false;
 bool sittingCheckComplete = false;
+bool mpuInitialized = false;
 unsigned long lastTiltCheckTime = 0;
-const unsigned long calibrationDuration = 5000; // Kalibrierdauer in Millisekunden
-const float tiltTolerance = 10.0; // Toleranz für die Neigungsprüfung in Grad
-const float sittingAccelZThreshold = 4000; // Schwellenwert für das Erkennen des Sitzens
+const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
+const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
+const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
 void setup() {
   playInitSound();
   Serial.begin(115200);
   Wire.begin();
-  pinMode(buzzerPin, OUTPUT); // Setzen des digitalen Pins als Ausgang für den Summer
+  pinMode(buzzerPin, OUTPUT); // Set digital pin as output for the buzzer
   Joystick.begin(false);
 
-  initializeMPU6050();
-  
+  if (!initializeMPU6050()) {
+    Serial.println("Failed to initialize MPU6050. Check connections and restart.");
+    while (true) {
+      playErrorSound();
+      delay(1000);
+    }
+  }
+
   Serial.println("Waiting for player to sit down...");
   playInitSound();
 }
@@ -75,37 +82,46 @@ void loop() {
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
     playErrorSound();
-    while (!mpu.testConnection()) {
+    unsigned long startAttemptTime = millis();
+    while (!mpu.testConnection() && millis() - startAttemptTime < 10000) { // 10 second timeout
       delay(500);
       Serial.print(".");
-      initializeMPU6050();
+      if (!mpuInitialized) {
+        initializeMPU6050();
+      }
     }
-    
-    initializeMPU6050();
-    Serial.println("MPU6050 reconnected.");
-    playSuccessSound();
+
+    if (mpu.testConnection()) {
+      Serial.println("MPU6050 reconnected.");
+      playSuccessSound();
+    } else {
+      Serial.println("Failed to reconnect MPU6050.");
+      playErrorSound();
+      delay(5000); // Wait 5 seconds before trying again
+      return; // Skip the rest of the loop if not reconnected
+    }
   }
 
   long currentMillis = millis();
-  // Prüfen, ob neue Daten vom DMP vorliegen
+  // Check for new data from DMP
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-    // Holen der Quaternion-Daten
+    // Get Quaternion data
     mpu.dmpGetQuaternion(&q, fifoBuffer);
-    // Holen des Schwerkraftvektors
+    // Get gravity vector
     mpu.dmpGetGravity(&gravity, &q);
-    // Holen von Yaw, Pitch und Roll
+    // Get Yaw, Pitch, and Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
     accelX = mpu.getAccelerationX();
     accelY = mpu.getAccelerationY();
-    accelZ = mpu.getAccelerationZ() - 16383; 
+    accelZ = mpu.getAccelerationZ() - 16383;
 
-    // Umrechnung in Grad
-    yaw = ypr[0] * 180/M_PI;
-    pitch = ypr[1] * 180/M_PI;
-    roll = ypr[2] * 180/M_PI;
-    
-    // Warten, bis der Spieler sitzt
+    // Convert to degrees
+    yaw = ypr[0] * 180 / M_PI;
+    pitch = ypr[1] * 180 / M_PI;
+    roll = ypr[2] * 180 / M_PI;
+
+    // Wait for player to sit
     if (!sittingCheckComplete) {
       if (accelZ > sittingAccelZThreshold) {
         playSuccessSound();
@@ -116,48 +132,48 @@ void loop() {
       return;
     }
 
-    // Prüfen auf ununterbrochene Neigung von 5 Sekunden
+    // Check for continuous tilt of 5 seconds
     if (!forwardDirectionDefined) {
-        if (checkTilt(pitch, roll, tiltTolerance)) {
-          if (lastTiltCheckTime == 0) {
-            lastTiltCheckTime = millis(); // Starten der Zeitmessung, wenn die Neigung ausreichend ist
-            playInitSound();
-          } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
-            // Berechnung des relativen Winkels
-            relativeAngle = -calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
-            Serial.print("Relative Angle: ");
-            Serial.println(relativeAngle);
+      if (checkTilt(pitch, roll, tiltTolerance)) {
+        if (lastTiltCheckTime == 0) {
+          lastTiltCheckTime = millis(); // Start timing when tilt is sufficient
+          playInitSound();
+        } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
+          // Calculate relative angle
+          relativeAngle = -calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
+          Serial.print("Relative Angle: ");
+          Serial.println(relativeAngle);
 
-            forwardDirectionDefined = true;
-            playSetupCompleteSound();
-            Serial.println("Forward direction defined!");
-            Serial.println("Setup Complete!");
-          }
-        } else {
-          if (lastTiltCheckTime != 0) { // Fehlergeräusch nur einmal abspielen
-            playErrorSound();
-          }
-          lastTiltCheckTime = 0; // Zurücksetzen der Zeitmessung, wenn die Neigung nicht ausreichend ist
+          forwardDirectionDefined = true;
+          playSetupCompleteSound();
+          Serial.println("Forward direction defined!");
+          Serial.println("Setup Complete!");
         }
-        return;
+      } else {
+        if (lastTiltCheckTime != 0) { // Play error sound only once
+          playErrorSound();
+        }
+        lastTiltCheckTime = 0; // Reset timing if tilt is not sufficient
+      }
+      return;
     }
-    
+
     float cosAngle = -cos(relativeAngle);
     float sinAngle = -sin(relativeAngle);
 
-    // Drehung der Roll- und Pitch-Werte entsprechend des relativen Winkels
+    // Rotate Roll and Pitch values according to the relative angle
     float newRoll = pitch * sinAngle + roll * cosAngle;
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
-    // Korrekte Zuordnung der neuen Roll- und Pitch-Werte zu den Joystick-Achsen
+    // Map new Roll and Pitch values to joystick axes
     joystickX = map(newRoll, -90, 90, 0, 1023);
     joystickY = map(newPitch, -90, 90, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
     joystickRx = map(newRoll, -90, 90, 0, 1023);
     joystickRy = map(newPitch, -90, 90, 0, 1023);
-    joystickRz = map(yaw, -180, 180, 0, 1023); // Verwenden von Yaw für Rz
-    
-    // Deadzones für X- und Y-Achse
+    joystickRz = map(yaw, -180, 180, 0, 1023); // Use Yaw for Rz
+
+    // Apply deadzones to X and Y axes
     joystickX = applyDeadzone(joystickX, 11);
     joystickY = applyDeadzone(joystickY, 11);
 
@@ -175,33 +191,36 @@ void loop() {
       Joystick.setButton(0, 0);
     }
 
-    Joystick.sendState(); // Senden des aktualisierten Zustands an den Host
+    Joystick.sendState(); // Send updated state to host
   }
 }
 
-void initializeMPU6050() {
-  //playInitSound();
+bool initializeMPU6050() {
   Serial.println("Initializing...");
 
-  // Initialisieren des MPU6050
+  // Initialize MPU6050
   mpu.initialize();
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection failed!");
     playErrorSound();
-    return;
+    mpuInitialized = false;
+    return false;
   }
-  
-  // Initialisieren des DMP
+
+  // Initialize DMP
   uint8_t devStatus = mpu.dmpInitialize();
   if (devStatus == 0) {
     mpu.setDMPEnabled(true);
     packetSize = mpu.dmpGetFIFOPacketSize();
     Serial.println("DMP ready!");
+    mpuInitialized = true;
   } else {
     Serial.print("DMP Initialization failed (code ");
     playErrorSound();
     Serial.print(devStatus);
     Serial.println(")");
+    mpuInitialized = false;
+    return false;
   }
 
   mpu.CalibrateAccel();
@@ -209,37 +228,38 @@ void initializeMPU6050() {
   Serial.println("Calibration complete!");
   playSuccessSound();
   delay(1000);
+  return true;
 }
 
 int applyDeadzone(int value, int deadzone) {
-    // Berechnung des Mittelpunktes des Ausgabebereichs
-    const int center = 511;  // Mittelpunkt für den Bereich [0, 1023]
-    int distance = value - center;
-    
-    // Wenn der Abstand vom Mittelpunkt kleiner als die Deadzone ist, den Ausgang auf den Mittelpunkt setzen
-    if (abs(distance) < deadzone) {
-        return center;
-    } else {
-        // Wenn außerhalb der Deadzone, den Wert linear vom Rand der Deadzone anpassen
-        return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) : 
-                                map(distance, -511, -deadzone, 0, center - deadzone);
-    }
+  // Calculate center of output range
+  const int center = 511; // Center for range [0, 1023]
+  int distance = value - center;
+
+  // If the distance from the center is less than the deadzone, set output to center
+  if (abs(distance) < deadzone) {
+    return center;
+  } else {
+    // If outside the deadzone, adjust value linearly from the edge of the deadzone
+    return (distance > 0) ? map(distance, deadzone, 511, center + deadzone, 1023) :
+                            map(distance, -511, -deadzone, 0, center - deadzone);
+  }
 }
 
 float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
-  // Normalisieren der Beschleunigungswerte
+  // Normalize acceleration values
   float norm = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
   accelX /= norm;
   accelY /= norm;
   accelZ /= norm;
-  
-  // Berechnung der Projektion auf die XY-Ebene (Bodenprojektion)
+
+  // Calculate projection on XY-plane (ground projection)
   float proj_x = accelX;
   float proj_y = accelY;
-  
-  // Berechnung des Winkels in der XY-Ebene zur Vorwärtsrichtung (positive y-Achse)
+
+  // Calculate angle in XY-plane relative to forward direction (positive y-axis)
   float angle = atan2(proj_y, proj_x);
-  
+
   return angle;
 }
 
@@ -250,7 +270,7 @@ bool checkTilt(float pitch, float roll, float tolerance) {
 void printRollPitchYawAccelZ() {
   Serial.print(F("roll: ")); Serial.print(roll);
   Serial.print(F(", pitch: ")); Serial.print(pitch);
-  Serial.print(F(", yaw: ")); Serial.print(yaw);  
+  Serial.print(F(", yaw: ")); Serial.print(yaw);
   Serial.print(F(", accelZ: ")); Serial.println(accelZ);
 }
 
@@ -264,9 +284,9 @@ void printJoystickValues(){
 }
 
 void playInitSound() {
-  tone(buzzerPin, 1000);  // Ton bei 1000 Hz abspielen
-  delay(150);     // Fortsetzen für 1 Sekunde
-  noTone(buzzerPin);      // Ton stoppen
+  tone(buzzerPin, 1000);  // Play tone at 1000 Hz
+  delay(150); // Continue for 150 ms
+  noTone(buzzerPin); // Stop tone
   delay(150);
   tone(buzzerPin, 1000);
   delay(150);
@@ -274,20 +294,20 @@ void playInitSound() {
 }
 
 void playErrorSound() {
-  // Der Summer gibt ein deutliches Fehlergeräusch von sich, indem ein tieferer Ton verwendet wird
-  tone(buzzerPin, 500);   // Ton bei 500 Hz abspielen
-  delay(250);     // Fortsetzen für 0,25 Sekunden
-  noTone(buzzerPin);      // Ton stoppen
-  delay(100);     // Kurze Pause
-  tone(buzzerPin, 500);   // Ton bei 500 Hz wiederholen
-  delay(250);     // Fortsetzen für 0,25 Sekunden
-  noTone(buzzerPin);      // Ton stoppen
+  // The buzzer emits a distinct error sound by using a lower tone
+  tone(buzzerPin, 500); // Play tone at 500 Hz
+  delay(250); // Continue for 250 ms
+  noTone(buzzerPin); // Stop tone
+  delay(100); // Short pause
+  tone(buzzerPin, 500); // Repeat tone at 500 Hz
+  delay(250); // Continue for 250 ms
+  noTone(buzzerPin); // Stop tone
 }
 
 void playSuccessSound() {
-  tone(buzzerPin, 1000);  // Ton bei 1000 Hz abspielen
-  delay(150);     // Fortsetzen für 0,75 Sekunden
-  tone(buzzerPin, 1200);  // Ton bei 1000 Hz abspielen
+  tone(buzzerPin, 1000); // Play tone at 1000 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1200); // Increase tone to 1200 Hz
   delay(150);
   tone(buzzerPin, 1400);
   delay(150);
@@ -295,20 +315,20 @@ void playSuccessSound() {
 }
 
 void playSetupCompleteSound() {
-  // Einfachen aufsteigenden Ton abspielen, um die Fertigstellung anzuzeigen
-  tone(buzzerPin, 800);   // Ton bei 800 Hz abspielen
-  delay(150);     // Fortsetzen für 0,2 Sekunden
-  tone(buzzerPin, 1000);  // Ton auf 1000 Hz erhöhen
-  delay(150);     // Fortsetzen für 0,2 Sekunden
-  tone(buzzerPin, 1200);  // Ton weiter auf 1200 Hz erhöhen
-  delay(150);     // Fortsetzen für 0,2 Sekunden
-  noTone(buzzerPin);      // Ton stoppen
+  // Play a simple ascending tone to indicate completion
+  tone(buzzerPin, 800); // Play tone at 800 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1000); // Increase tone to 1000 Hz
+  delay(150); // Continue for 150 ms
+  tone(buzzerPin, 1200); // Further increase tone to 1200 Hz
+  delay(150); // Continue for 150 ms
+  noTone(buzzerPin); // Stop tone
 
-  // Kurze Pause einlegen
+  // Add a short pause
   delay(150);
 
-  // Letzten hohen Ton abspielen, um die Bereitschaft endgültig zu signalisieren
-  tone(buzzerPin, 1500);  // Höheren Ton bei 1500 Hz abspielen
-  delay(300);     // Fortsetzen für 0,3 Sekunden
-  noTone(buzzerPin);      // Ton stoppen
+  // Play final high tone to signal readiness
+  tone(buzzerPin, 1500); // Play higher tone at 1500 Hz
+  delay(300); // Continue for 300 ms
+  noTone(buzzerPin); // Stop tone
 }
