@@ -72,7 +72,7 @@ The code for this project performs several key functions:
 - [MPU6050](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to wire MPU6050
 - [Buzzer](https://images.app.goo.gl/mgFJdeP5EhSxzM8t5): How to wire a buzzer
 - [RGB-LED](https://images.app.goo.gl/b1UZzW2y5GSzTEi26): How to wire a RGB-LED
-- [Rrechargeable Battery](https://learn.adafruit.com/3d-printed-case-for-adafruit-feather/assembly): How to wire a rechargeable battery  
+- [Rechargeable Battery](https://learn.adafruit.com/3d-printed-case-for-adafruit-feather/assembly): How to wire a rechargeable battery  
 
 ## Contributors
 
