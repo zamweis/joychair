@@ -1,10 +1,10 @@
-# ChairIO Interface for VR Navigation - Feather 32u4 Bluefruit LE
+# Joychair Interface for VR Navigation - Feather 32u4 Bluefruit LE
 
-Welcome to the ChairIO Interface project for Feather 32u4 Bluefruit LE! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using a Feather 32u4 Bluefruit LE board. Note: Currently, only wired transmission is supported as the Bluetooth function is not working properly.
+Welcome to the Joychair Interface project for Feather 32u4 Bluefruit LE! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using a Feather 32u4 Bluefruit LE board. Note: Currently, only wired transmission is supported as the Bluetooth function is not working properly.
 
 ## Project Overview
 
-The ChairIO Interface captures the movements of the Aeris Swopper chair and integrates them directly into VR environments, particularly in Unity. This setup uses the Feather 32u4 Bluefruit LE microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it via a wired connection.
+The Joychair Interface captures the movements of the Aeris Swopper chair and integrates them directly into VR environments, particularly in Unity. This setup uses the Feather 32u4 Bluefruit LE microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it via a wired connection.
 
 ## Hardware Setup
 
