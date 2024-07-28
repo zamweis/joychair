@@ -1,10 +1,10 @@
-# ChairIO Interface for VR Navigation - Arduino Leonardo
+# Joychair Interface for VR Navigation - Arduino Leonardo
 
-Welcome to the ChairIO Interface project for Arduino Leonardo! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an Arduino Leonardo board and sensors.
+Welcome to the Joychair Interface project for Arduino Leonardo! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an Arduino Leonardo board and sensors.
 
 ## Project Overview
 
-The ChairIO Interface captures the movements of the Aeris Swopper chair and integrates them into a solution for VR environments, particularly in Unity. This setup uses the Arduino Leonardo microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it wirelessly/wired.
+The Joychair Interface captures the movements of the Aeris Swopper chair and integrates them into a solution for VR environments, particularly in Unity. This setup uses the Arduino Leonardo microcontroller to read data from an Inertial Measurement Unit (IMU) and transmit it wirelessly/wired.
 
 ## Hardware Setup
 
