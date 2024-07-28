@@ -75,7 +75,7 @@ The code for this project performs several key functions:
 
 ## Contributors
 
-- Sam Weiler (@zamweis): Project Lead
+- Sam Weiler (@zamweis)
 
 ## License
 
