@@ -10,6 +10,14 @@ The project was done with platformio plugin for vscode. The used libraries are a
 
 ## Project Components
 
+### Hardware Parts
+- M2.5 Machine Screws and Nuts
+- 2000mAh Battery
+- SPDT Slide Switch
+- JST-PH (Male)
+- JST-PH (Female)
+- JST-PH extension cable (optional but easier)
+
 ### Hardware Setup
 
 The project utilizes different microcontroller boards along with sensors, such as an Inertial Measurement Unit (IMU), attached to the chair. The IMU captures the chair's movements, which are then transmitted wirelessly/wired.
