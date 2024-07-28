@@ -26,7 +26,44 @@ To set up the ChairIO Interface project, follow these steps:
 
 1. **Hardware Setup**: Attach the IMU sensor to the Aeris Swopper chair as per the instructions provided.
 2. **Arduino Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly/wired.
-4. **Unity Integration**: Import the output into Unity and configure the VR environment to respond to the chair's movements for navigation.
+3. **Unity Integration**: Import the output into Unity and configure the VR environment to respond to the chair's movements for navigation.
+
+## Basic Functionality
+
+The code for this project performs several key functions:
+
+1. **Initialization**: 
+   - Sets up the MPU6050 IMU and the joystick library.
+   - Plays an initialization sound.
+
+2. **Connection Check**:
+   - Continuously checks if the MPU6050 is connected.
+   - If the connection is lost, it tries to reconnect.
+
+3. **Data Processing**:
+   - Reads data from the IMU, calculates yaw, pitch, and roll.
+   - Maps these values to joystick axes.
+
+4. **Calibration and Direction Declaration**:
+   - Waits for the player to sit down by detecting a sufficient acceleration threshold.
+   - Once seated, the player is prompted to tilt forward for a few seconds to calibrate the forward direction.
+   - After holding the tilt for the calibration duration, the forward direction is defined.
+
+5. **Joystick Output**:
+   - Maps the processed data to joystick inputs for VR navigation.
+   - Applies deadzones to the joystick axes to filter out noise.
+
+### Calibration and Direction Declaration
+
+1. **Wait for Player to Sit**:
+   - The system waits until the acceleration in the Z-axis exceeds the sitting threshold.
+
+2. **Tilt Forward to Calibrate**:
+   - Once the player is seated, they are prompted to tilt forward and hold the position for a few seconds.
+   - If the tilt is held for the required calibration duration, the system calculates the relative angle and sets the forward direction.
+
+3. **Forward Direction Defined**:
+   - After successful calibration, the system plays a setup complete sound and indicates that the forward direction is defined.
 
 ## Additional Resources
 
