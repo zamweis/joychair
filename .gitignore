@@ -7,5 +7,5 @@ include/
 lib/
 test/
 .vscode/*
-platformio.ini
 src/main.cpp
+/platformio.ini
