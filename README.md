@@ -1,10 +1,10 @@
 # Joychair - Interface for VR Navigation
 
-Welcome to the ChairIO Interface project! This project aims to integrate the movements of an [Aeris Swopper chair](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen) into virtual reality (VR) environments, allowing users to navigate virtual worlds by shifting their weight on the chair. The idea behind this project is inspired by the concept of ChairIO, as described in the paper ["ChairIO - the Chair-Based Interface"](https://www.researchgate.net/publication/233819716_ChairIO--the_Chair-Based_Interface).
+Welcome to the Joychair Interface project! This project aims to integrate the movements of an [Aeris Swopper chair](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen) into virtual reality (VR) environments, allowing users to navigate virtual worlds by shifting their weight on the chair. The idea behind this project is inspired by the concept of ChairIO, as described in the paper ["ChairIO - the Chair-Based Interface"](https://www.researchgate.net/publication/233819716_ChairIO--the_Chair-Based_Interface).
 
 ## Project Overview
 
-The ChairIO Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems (Fakultät IWI). The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
+The Joychair Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems (Fakultät IWI). The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
 
 ## Project Components
 
@@ -22,7 +22,7 @@ In Unity, the output is used to control the user's movement within the VR enviro
 
 ## Setup Instructions
 
-To set up the ChairIO Interface project, follow these steps:
+To set up the Joychair Interface project, follow these steps:
 
 1. **Hardware Setup**: Attach the IMU sensor to the Aeris Swopper chair as per the instructions provided.
 2. **Arduino Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly/wired.
