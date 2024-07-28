@@ -17,9 +17,9 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 
 ### Casing
 
-3D-printed with Prusa MK2
-[Thingyverse](https://www.thingiverse.com/thing:2209964)
-[Additional Tutorial](https://www.thingiverse.com/thing:2209964) for accu/battery integration
+3D-printed with Prusa MK2#
+[Thingyverse](https://www.thingiverse.com/thing:2209964)#
+[Additional Tutorial](https://www.thingiverse.com/thing:2209964) for accu/battery integration#
 
 ### Wiring
 1. Connect the MPU6050 IMU to the Feather 32u4 via I2C (SDA to SDA, SCL to SCL).
