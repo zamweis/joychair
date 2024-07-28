@@ -4,7 +4,7 @@ Welcome to the Joychair Interface project! This project aims to integrate the mo
 
 ## Project Overview
 
-The Joychair Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems (Fakultät IWI). The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
+The Joychair Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems. The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
 
 ## Project Components
 
