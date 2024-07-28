@@ -4,30 +4,29 @@ Welcome to the ChairIO Interface project! This project aims to integrate the mov
 
 ## Project Overview
 
-The ChairIO Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems (Fakultät IWI). The goal is to capture the movements of the Aeris Swopper chair and integrate them into a middleware solution that can be used within VR environments, particularly in Unity.
+The ChairIO Interface project is being developed at the iXperience Lab of the Faculty of Computer Science and Business Information Systems (Fakultät IWI). The goal is to capture the movements of the Aeris Swopper chair and integrate them into a solution that can be used within VR environments, particularly in Unity.
 
 ## Project Components
 
 ### Hardware Setup
 
-The project utilizes an Arduino Leonardo microcontroller board along with sensors, such as an Inertial Measurement Unit (IMU), attached to the chair. The IMU captures the chair's movements, which are then transmitted wirelessly to the middleware.
+The project utilizes different microcontroller boards along with sensors, such as an Inertial Measurement Unit (IMU), attached to the chair. The IMU captures the chair's movements, which are then transmitted wirelessly/wired.
 
-### Middleware
-
-The middleware serves as the bridge between the hardware (Arduino) and the VR environment (Unity). It receives the data from the sensors and translates it into usable inputs for VR navigation.
+- [Arduino Leonardo Setup](./arduino_leonardo)
+- [ESP32 Setup](./esp32)
+- [Feather 32u4 Bluefruit LE Setup](./feather32u4_bluetfruit_le)
 
 ### Unity Integration
 
-In Unity, the middleware's output is used to control the user's movement within the VR environment. By shifting their weight on the chair, users can navigate through virtual worlds seamlessly.
+In Unity, the output is used to control the user's movement within the VR environment. By shifting their weight on the chair, users can navigate through virtual worlds seamlessly.
 
 ## Setup Instructions
 
 To set up the ChairIO Interface project, follow these steps:
 
 1. **Hardware Setup**: Attach the IMU sensor to the Aeris Swopper chair as per the instructions provided.
-2. **Arduino Configuration**: Program the Arduino Leonardo board to read data from the IMU and transmit it wirelessly to the middleware.
-3. **Middleware Setup**: Set up the middleware software (NodeJS-based) to receive data from the Arduino and process it for Unity integration.
-4. **Unity Integration**: Import the middleware's output into Unity and configure the VR environment to respond to the chair's movements for navigation.
+2. **Arduino Configuration**: Program the microcontroller board to read data from the IMU and transmit it wirelessly/wired.
+4. **Unity Integration**: Import the output into Unity and configure the VR environment to respond to the chair's movements for navigation.
 
 ## Additional Resources
 
