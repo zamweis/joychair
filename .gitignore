@@ -6,3 +6,6 @@
 include/
 lib/
 test/
+.vscode/*
+src/main.cpp
+/platformio.ini
