@@ -22,18 +22,10 @@
  * start and select are enabled by default
  */
 
-#include <Arduino.h>
 #include <BleGamepad.h>
 #include <Wire.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-
-// Define pin numbers for the RGB LED
-int redPin = 11;
-int greenPin = 10;
-int bluePin = 9;
-long previousMillis = 0;  // will store last time LED was updated
-long interval = 250;  // interval at which to blink (milliseconds)
 
 // Function and variable declarations
 void playInitSound();
@@ -43,9 +35,18 @@ void playErrorSound();
 void printRollPitchYawAccelZ();
 void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
+float calculateTilt(float pitch, float roll);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
 bool initializeMPU6050();
+
+// Define pin numbers for the RGB LED
+int redPin = 11;
+int greenPin = 10;
+int bluePin = 9;
+int buzzerPin = 4;
+long previousMillis = 0;  // will store last time LED was updated
+long interval = 250;  // interval at which to blink (milliseconds)
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -63,13 +64,6 @@ float relativeAngle; // Angle of sensor rotation
 
 MPU6050 mpu;
 
-Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID, JOYSTICK_TYPE_GAMEPAD,
-                   1, 0,                   // Number of buttons, Hat Switch Count
-                   true, true, true,       // X, Y, and Z axis
-                   true, true, true,       // Rx, Ry, and Rz
-                   false, false,           // Rudder and Throttle
-                   false, false, false);   // Accelerator, Brake, and Steering
-
 BleGamepad bleGamepad("Joychair", "iXperienceLab", 100);
 
 int joystickX;
@@ -82,45 +76,40 @@ int joystickRz;
 float cosAngle;
 float sinAngle;
 
-int jumpThreshold = 800;
-int buzzerPin = 6;
+int jumpThreshold = 3000;
 
 bool forwardDirectionDefined = false;
 bool sittingCheckComplete = false;
 bool mpuInitialized = false;
 unsigned long lastTiltCheckTime = 0;
+unsigned long lastJumpTime = 0; // Track the last jump time
+const unsigned long jumpCooldown = 500; // 500ms cooldown between jumps
 const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
-const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
+const float tiltTolerance = 5; // Tolerance for tilt check in radiants
 const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
-void setup()
-{
-    Wire.begin();
+void setup() {
+  Wire.begin();
 
   Serial.begin(115200);
 
   Serial.println("Starting BLE work!");
-  bleGamepad.begin(); // The default bleGamepad.begin() above enables 16 buttons, all axes, one hat, and no simulation controls or special buttons
-
+  bleGamepad.begin();
   playInitSound();
-  Wire.begin();
-  pinMode(buzzerPin, OUTPUT); // Set digital pin as output for the buzzer
-  Joystick.begin(false);
 
-  if (!initializeMPU6050()) {
-    Serial.println("Failed to initialize MPU6050. Check connections and restart.");
-    while (true) {
-      playErrorSound();
-      delay(1000);
-    }
+  // Initialize MPU6050
+  while(!initializeMPU6050()) {
+    Serial.println("Failed to initialize MPU6050.");
+    playErrorSound();
+    delay(1000);
   }
 
   Serial.println("Waiting for player to sit down...");
   playInitSound();
 }
 
-void loop()
-{
+
+void loop() {
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
     playErrorSound();
@@ -154,14 +143,18 @@ void loop()
     // Get Yaw, Pitch, and Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
-    accelX = mpu.getAccelerationX();
-    accelY = mpu.getAccelerationY();
     accelZ = mpu.getAccelerationZ() - 16383;
 
     // Convert to degrees
     yaw = ypr[0] * 180 / M_PI;
     pitch = ypr[1] * 180 / M_PI;
     roll = ypr[2] * 180 / M_PI;
+/*
+    Serial.print("Tilt: ");
+    Serial.print(calculateTilt(pitch, roll));
+    Serial.print("Accelz: ");
+    Serial.println(accelZ);
+*/
 
     // Wait for player to sit
     if (!sittingCheckComplete) {
@@ -208,43 +201,23 @@ void loop()
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Map new Roll and Pitch values to joystick axes
-    joystickX = map(newRoll, -90, 90, 0, 1023);
-    joystickY = map(newPitch, -90, 90, 0, 1023);
+    joystickX = map(newRoll, -10, 10, 0, 1023);
+    joystickY = map(newPitch, -10, 10, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
     joystickRx = map(newRoll, -90, 90, 0, 1023);
     joystickRy = map(newPitch, -90, 90, 0, 1023);
     joystickRz = map(yaw, -180, 180, 0, 1023); // Use Yaw for Rz
 
     // Apply deadzones to X and Y axes
-    joystickX = applyDeadzone(joystickX, 11);
-    joystickY = applyDeadzone(joystickY, 11);
+    joystickX = applyDeadzone(joystickX, 5);
+    joystickY = applyDeadzone(joystickY, 5);
 
-    Joystick.setXAxis(joystickX);
-    Joystick.setYAxis(joystickY);
-    Joystick.setZAxis(joystickZ);
-    Joystick.setRxAxis(joystickRx);
-    Joystick.setRyAxis(joystickRy);
-    Joystick.setRzAxis(joystickRz);
-
-    if (joystickZ > jumpThreshold) {
-      Joystick.setButton(0, 1);
-      Serial.println("Jump detected with height: " + String(joystickZ));
+    if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
+      Serial.println("Jump detected!");
+      bleGamepad.press(BUTTON_5);
+      lastJumpTime = currentMillis; // Update the last jump time
     } else {
-      Joystick.setButton(0, 0);
-    }
-
-    Joystick.sendState(); // Send updated state to host
-    if (bleGamepad.isConnected())
-    {
-        if (joystickZ > jumpThreshold)
-        {
-          bleGamepad.press(BUTTON_5);
-        } else {
-          bleGamepad.release(BUTTON_5);
-        }
-
-        bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRx, joystickRy, joystickRz, 16383, 16383);
-        // All axes, sliders, hats etc can also be set independently. See the IndividualAxes.ino example
+      bleGamepad.release(BUTTON_5);
     }
   }
 }
@@ -319,6 +292,10 @@ float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
 
 bool checkTilt(float pitch, float roll, float tolerance) {
   return (abs(pitch) > tolerance || abs(roll) > tolerance);
+}
+
+float calculateTilt(float pitch, float roll){
+  return max(abs(roll), abs(pitch));
 }
 
 void printRollPitchYawAccelZ() {
