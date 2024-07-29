@@ -212,12 +212,16 @@ void loop() {
     joystickX = applyDeadzone(joystickX, 5);
     joystickY = applyDeadzone(joystickY, 5);
 
-    if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
-      Serial.println("Jump detected!");
-      bleGamepad.press(BUTTON_5);
-      lastJumpTime = currentMillis; // Update the last jump time
-    } else {
-      bleGamepad.release(BUTTON_5);
+    if (bleGamepad.isConnected())
+    {
+      if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
+        Serial.println("Jump detected!");
+        bleGamepad.press(BUTTON_5);
+        lastJumpTime = currentMillis; // Update the last jump time
+      } else {
+        bleGamepad.release(BUTTON_5);
+      }
+      bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRx, joystickRy, joystickRz, 16383, 16383);
     }
   }
 }
