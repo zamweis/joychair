@@ -11,6 +11,7 @@ void playErrorSound();
 void printRollPitchYawAccelZ();
 void printJoystickValues();
 int applyDeadzone(int value, int deadzone);
+float calculateTilt(float pitch, float roll);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
 bool initializeMPU6050();
@@ -48,15 +49,17 @@ int joystickRz;
 float cosAngle;
 float sinAngle;
 
-int jumpThreshold = 800;
+int jumpThreshold = 3000;
 int buzzerPin = 6;
 
 bool forwardDirectionDefined = false;
 bool sittingCheckComplete = false;
 bool mpuInitialized = false;
 unsigned long lastTiltCheckTime = 0;
+unsigned long lastJumpTime = 0; // Track the last jump time
+const unsigned long jumpCooldown = 500; // 500ms cooldown between jumps
 const unsigned long calibrationDuration = 5000; // Calibration duration in milliseconds
-const float tiltTolerance = 10.0; // Tolerance for tilt check in degrees
+const float tiltTolerance = 5; // Tolerance for tilt check in radiants
 const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
 void setup() {
@@ -112,14 +115,18 @@ void loop() {
     // Get Yaw, Pitch, and Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
-    accelX = mpu.getAccelerationX();
-    accelY = mpu.getAccelerationY();
     accelZ = mpu.getAccelerationZ() - 16383;
 
     // Convert to degrees
     yaw = ypr[0] * 180 / M_PI;
     pitch = ypr[1] * 180 / M_PI;
     roll = ypr[2] * 180 / M_PI;
+/*
+    Serial.print("Tilt: ");
+    Serial.print(calculateTilt(pitch, roll));
+    Serial.print("Accelz: ");
+    Serial.println(accelZ);
+*/
 
     // Wait for player to sit
     if (!sittingCheckComplete) {
@@ -166,16 +173,16 @@ void loop() {
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Map new Roll and Pitch values to joystick axes
-    joystickX = map(newRoll, -90, 90, 0, 1023);
-    joystickY = map(newPitch, -90, 90, 0, 1023);
+    joystickX = map(newRoll, -10, 10, 0, 1023);
+    joystickY = map(newPitch, -10, 10, 0, 1023);
     joystickZ = map(accelZ, -32767, 32767, 0, 1023);
     joystickRx = map(newRoll, -90, 90, 0, 1023);
     joystickRy = map(newPitch, -90, 90, 0, 1023);
     joystickRz = map(yaw, -180, 180, 0, 1023); // Use Yaw for Rz
 
     // Apply deadzones to X and Y axes
-    joystickX = applyDeadzone(joystickX, 11);
-    joystickY = applyDeadzone(joystickY, 11);
+    joystickX = applyDeadzone(joystickX, 5);
+    joystickY = applyDeadzone(joystickY, 5);
 
     Joystick.setXAxis(joystickX);
     Joystick.setYAxis(joystickY);
@@ -184,9 +191,10 @@ void loop() {
     Joystick.setRyAxis(joystickRy);
     Joystick.setRzAxis(joystickRz);
 
-    if (joystickZ > jumpThreshold) {
+    if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
       Joystick.setButton(0, 1);
-      Serial.println("Jump detected with height: " + String(joystickZ));
+      Serial.println("Jump detected!");
+      lastJumpTime = currentMillis; // Update the last jump time
     } else {
       Joystick.setButton(0, 0);
     }
@@ -265,6 +273,10 @@ float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
 
 bool checkTilt(float pitch, float roll, float tolerance) {
   return (abs(pitch) > tolerance || abs(roll) > tolerance);
+}
+
+float calculateTilt(float pitch, float roll){
+  return max(abs(roll), abs(pitch));
 }
 
 void printRollPitchYawAccelZ() {
