@@ -105,6 +105,11 @@ void loop() {
     bleGamepad.setAxes(joystickX, joystickY, ...);
 }
 ```
+## Info ##
+
+### Battery Level
+
+Currently, the battery level measurement functionality is not working correctly with my SparkFun ESP32 Thing.
 
 ## Additional Resources
 
