@@ -35,8 +35,8 @@ lib_deps =
 ## Description
 
 ### LED-Indicator
-- ***red blinking:*** a error occured
-- ***green blinking:*** an initialization has begun
-- ***blue blinking:*** bluetooth device not connected
-- ***green static:*** an initialization has ended without errors
-- ***pink static:*** everything works
+- ***red blinking:*** An error occurred
+- ***green blinking:*** Initialization has begun
+- ***blue blinking:*** Bluetooth device not connected
+- ***green static:*** Initialization has ended without errors
+- ***pink static:*** Code running normaly
