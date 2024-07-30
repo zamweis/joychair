@@ -31,3 +31,12 @@ lib_deps =
     lemmingdev/ESP32-BLE-Gamepad@^0.5.5
     mbed-syundo0730/I2Cdev@0.0.0+sha.3aa973ebe3e5
     electroniccats/MPU6050@^1.3.1
+```
+## Description
+
+### LED-Indicator
+- ***red blinking:*** a error occured
+- ***green blinking:*** an initialization has begun
+- ***blue blinking:*** bluetooth device not connected
+- ***green static:*** an initialization has ended without errors
+- ***pink static:*** everything works
