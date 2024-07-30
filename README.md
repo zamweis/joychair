@@ -2,7 +2,7 @@
 
 Welcome to the Joychair Interface project! This project aims to integrate the movements of an [Aeris Swopper chair](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen) into virtual reality (VR) environments, allowing users to navigate virtual worlds by shifting their weight on the chair. The idea behind this project is inspired by the concept of ChairIO, as described in the paper ["ChairIO - the Chair-Based Interface"](https://www.researchgate.net/publication/233819716_ChairIO--the_Chair-Based_Interface).
 
-![Joychair - ESP32](./joychair_esp32.jpg)
+![Joychair - ESP32](./Joychair_esp32.jpg)
 
 ## Project Overview
 
