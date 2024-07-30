@@ -30,10 +30,10 @@
 // Function and variable declarations
 void blinkLED();
 void playInitSound();
+int getBatteryLevel();
 void playErrorSound();
 void playSuccessSound();
 bool initializeMPU6050();
-void checkBatteryLevel();
 void printJoystickValues();
 void playSetupCompleteSound();
 void printRollPitchYawAccelZ();
@@ -49,11 +49,15 @@ int greenPin = 26;
 int bluePin = 27;
 int buzzerPin = 13;
 long lastBlink = 0;  // will store last time LED was updated
-long blinkInterval = 250;  // interval at which to blink (milliseconds)
+long blinkInterval = 500;  // interval at which to blink (milliseconds)
 bool blinkRed = false;
 bool blinkBlue = false;
 bool blinkGreen = false;
-bool blinkOrange = false;
+
+// Battery
+int batteryPin = 36; // ADC1 channel 0 is GPIO36
+float minBatteryVoltage = 3.0; // Minimum expected battery voltage (discharged LiPo)
+float maxBatteryVoltage = 4.2; // Maximum expected battery voltage (fully charged LiPo)
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -96,7 +100,7 @@ const float tiltTolerance = 5; // Tolerance for tilt check in radiants
 const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
 void setup() {
-  setLEDColor("green");
+  playInitSound();
   blinkLED();
   Wire.begin();
 
@@ -107,9 +111,11 @@ void setup() {
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
 
+  // Initialize the battery pin as an input
+  pinMode(batteryPin, INPUT);
+
   Serial.println("Starting BLE work!");
   bleGamepad.begin();
-  playInitSound();
 
   // Initialize MPU6050
   while(!initializeMPU6050()) {
@@ -118,6 +124,7 @@ void setup() {
     delay(1000);
   }
 
+  delay(500);
   Serial.println("Waiting for player to sit down...");
   playInitSound();
 }
@@ -126,11 +133,8 @@ void setup() {
 void loop() {
   long currentMillis = millis();
 
-  // Blink the LED based on the current state
-  blinkLED();
-
-  // Check the battery level and set the blinkOrange variable accordingly
-  checkBatteryLevel();
+  // Check the battery level
+  int batteryLevel = getBatteryLevel();
 
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
@@ -150,6 +154,7 @@ void loop() {
     } else {
       Serial.println("Failed to reconnect MPU6050.");
       playErrorSound();
+      blinkLED();
       delay(5000); // Wait 5 seconds before trying again
       return; // Skip the rest of the loop if not reconnected
     }
@@ -185,6 +190,8 @@ void loop() {
         Serial.println("Player detected.");
         Serial.println("Tilt forward and hold for a few seconds...");
       }
+      
+      blinkLED();
       return;
     }
 
@@ -211,6 +218,8 @@ void loop() {
         }
         lastTiltCheckTime = 0; // Reset timing if tilt is not sufficient
       }
+      
+      blinkLED();
       return;
     }
 
@@ -242,8 +251,10 @@ void loop() {
         bleGamepad.release(BUTTON_5);
       }
       bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRx, joystickRy, joystickRz, 16383, 16383);
+      bleGamepad.setBatteryLevel(batteryLevel);
     }
   }
+  blinkLED();
 }
 
 bool initializeMPU6050() {
@@ -339,7 +350,6 @@ void printJoystickValues(){
 
 void playInitSound() {
   setLEDColor("blue");
-  blinkLED();
   tone(buzzerPin, 1000);  // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   noTone(buzzerPin); // Stop tone
@@ -351,7 +361,6 @@ void playInitSound() {
 
 void playErrorSound() {
   setLEDColor("red");
-  blinkLED();
   // The buzzer emits a distinct error sound by using a lower tone
   tone(buzzerPin, 500); // Play tone at 500 Hz
   delay(250); // Continue for 250 ms
@@ -364,7 +373,6 @@ void playErrorSound() {
 
 void playSuccessSound() {
   setLEDColor("green");
-  blinkLED();
   tone(buzzerPin, 1000); // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   tone(buzzerPin, 1200); // Increase tone to 1200 Hz
@@ -376,7 +384,6 @@ void playSuccessSound() {
 
 void playSetupCompleteSound() {
   setLEDColor("green");
-  blinkLED();
   // Play a simple ascending tone to indicate completion
   tone(buzzerPin, 800); // Play tone at 800 Hz
   delay(150); // Continue for 150 ms
@@ -406,38 +413,21 @@ void blinkLED() {
     // Toggle the LED states based on the control variables
     if (blinkRed) {
       digitalWrite(redPin, !digitalRead(redPin));
-    } else {
-      digitalWrite(redPin, LOW); // Ensure the LED is off if not blinking
-    }
-
-    if (blinkGreen) {
-      digitalWrite(greenPin, !digitalRead(greenPin));
-    } else {
-      digitalWrite(greenPin, LOW); // Ensure the LED is off if not blinking
-    }
-
-    if (blinkBlue) {
+      digitalWrite(greenPin, LOW);
+      digitalWrite(bluePin, LOW);
+    } else if (blinkGreen) {
+      digitalWrite(redPin, LOW);
+      digitalWrite(greenPin, HIGH);
+      digitalWrite(bluePin, LOW);
+    } else if (blinkBlue) {
+      digitalWrite(redPin, LOW);
+      digitalWrite(greenPin, LOW);
       digitalWrite(bluePin, !digitalRead(bluePin));
     } else {
-      digitalWrite(bluePin, LOW); // Ensure the LED is off if not blinking
+      digitalWrite(redPin, LOW);
+      digitalWrite(greenPin, LOW);
+      digitalWrite(bluePin, LOW);
     }
-
-    if (blinkOrange) {
-      digitalWrite(redPin, !digitalRead(redPin));
-      digitalWrite(greenPin, !digitalRead(greenPin));
-    } else {
-      digitalWrite(redPin, LOW); // Ensure the LED is off if not blinkinggreenPin
-      digitalWrite(greenPin, LOW); // Ensure the LED is off if not blinkinggreenPin
-    }
-  }
-}
-
-void checkBatteryLevel() {
-  int batteryLevel = analogRead(A0); // Assume the battery level is read from analog pin A0
-  int batteryThreshold = 500; // Set a threshold for low battery
-
-  if (batteryLevel < batteryThreshold) {
-    setLEDColor("orange");
   }
 }
 
@@ -446,7 +436,6 @@ void setLEDColor(String color) {
   blinkRed = false;
   blinkGreen = false;
   blinkBlue = false;
-  blinkOrange = false;
 
   // Check the input string and set the appropriate flag to true
   if (color == "red") {
@@ -455,7 +444,52 @@ void setLEDColor(String color) {
     blinkGreen = true;
   } else if (color == "blue") {
     blinkBlue = true;
-  } else if (color == "orange") {
-    blinkOrange = true;
   }
+}
+
+int getBatteryLevel() {
+  // Read the raw analog value from the battery pin
+  int rawValue = analogRead(batteryPin);
+
+  // Debugging output for raw ADC value
+  Serial.print("Raw ADC Value: ");
+  Serial.println(rawValue);
+
+  // If the raw ADC value is 0, there's likely an issue with the hardware connection
+  if (rawValue == 0) {
+    Serial.println("Error: ADC read value is 0. Check battery connection and pin configuration.");
+    return 0;
+  }
+
+  // Convert the raw value to a voltage level
+  // ESP32 ADC resolution is 12 bits (4095 levels) and default reference voltage is 3.3V
+  float batteryVoltage = (rawValue / 4095.0) * 3.3;
+
+  // Debugging output for voltage
+  Serial.print("Battery Voltage: ");
+  Serial.println(batteryVoltage);
+
+  // Adjust the voltage based on the known maximum ADC input voltage
+  // SparkFun ESP32 Thing has a voltage divider that scales down the voltage by a factor of 2
+  batteryVoltage *= 2;
+
+  // Debugging output for adjusted voltage
+  Serial.print("Adjusted Battery Voltage: ");
+  Serial.println(batteryVoltage);
+
+  // Calculate the battery percentage
+  int batteryPercentage = (int)((batteryVoltage - minBatteryVoltage) / (maxBatteryVoltage - minBatteryVoltage) * 100);
+
+  // Ensure the percentage is within 0-100%
+  if (batteryPercentage < 0) {
+    batteryPercentage = 0;
+  } else if (batteryPercentage > 100) {
+    batteryPercentage = 100;
+  }
+
+  // Debugging output for battery percentage
+  Serial.print("Battery Percentage: ");
+  Serial.println(batteryPercentage);
+
+  return batteryPercentage;
 }
