@@ -28,25 +28,32 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 
 // Function and variable declarations
+void blinkLED();
 void playInitSound();
-void playSuccessSound();
-void playSetupCompleteSound();
 void playErrorSound();
-void printRollPitchYawAccelZ();
+void playSuccessSound();
+bool initializeMPU6050();
+void checkBatteryLevel();
 void printJoystickValues();
+void playSetupCompleteSound();
+void printRollPitchYawAccelZ();
+void setLEDColor(String color);
 int applyDeadzone(int value, int deadzone);
 float calculateTilt(float pitch, float roll);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
-bool initializeMPU6050();
 
 // Define pin numbers for the RGB LED
-int redPin = 11;
-int greenPin = 10;
-int bluePin = 9;
-int buzzerPin = 4;
-long previousMillis = 0;  // will store last time LED was updated
-long interval = 250;  // interval at which to blink (milliseconds)
+int redPin = 25;
+int greenPin = 26;
+int bluePin = 27;
+int buzzerPin = 13;
+long lastBlink = 0;  // will store last time LED was updated
+long blinkInterval = 250;  // interval at which to blink (milliseconds)
+bool blinkRed = false;
+bool blinkBlue = false;
+bool blinkGreen = false;
+bool blinkOrange = false;
 
 uint16_t packetSize;
 uint8_t fifoBuffer[64];
@@ -89,9 +96,16 @@ const float tiltTolerance = 5; // Tolerance for tilt check in radiants
 const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
 void setup() {
+  setLEDColor("green");
+  blinkLED();
   Wire.begin();
 
   Serial.begin(115200);
+
+  // initialize the digital pin as an output.
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
 
   Serial.println("Starting BLE work!");
   bleGamepad.begin();
@@ -110,6 +124,14 @@ void setup() {
 
 
 void loop() {
+  long currentMillis = millis();
+
+  // Blink the LED based on the current state
+  blinkLED();
+
+  // Check the battery level and set the blinkOrange variable accordingly
+  checkBatteryLevel();
+
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
     playErrorSound();
@@ -133,7 +155,6 @@ void loop() {
     }
   }
 
-  long currentMillis = millis();
   // Check for new data from DMP
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
     // Get Quaternion data
@@ -201,19 +222,18 @@ void loop() {
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Map new Roll and Pitch values to joystick axes
-    joystickX = map(newRoll, -10, 10, 0, 1023);
-    joystickY = map(newPitch, -10, 10, 0, 1023);
-    joystickZ = map(accelZ, -32767, 32767, 0, 1023);
-    joystickRx = map(newRoll, -90, 90, 0, 1023);
-    joystickRy = map(newPitch, -90, 90, 0, 1023);
-    joystickRz = map(yaw, -180, 180, 0, 1023); // Use Yaw for Rz
+    joystickX = map(newRoll, -10, 10, 0, 32767);
+    joystickY = map(newPitch, -10, 10, 0, 32767);
+    joystickZ = map(accelZ, -32767, 32767, 0, 32767);
+    joystickRx = map(newRoll, -90, 90, 0, 32767);
+    joystickRy = map(newPitch, -90, 90, 0, 32767);
+    joystickRz = map(yaw, -180, 180, 0, 32767); // Use Yaw for Rz
 
     // Apply deadzones to X and Y axes
     joystickX = applyDeadzone(joystickX, 5);
     joystickY = applyDeadzone(joystickY, 5);
 
-    if (bleGamepad.isConnected())
-    {
+    if (bleGamepad.isConnected()) {
       if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
         Serial.println("Jump detected!");
         bleGamepad.press(BUTTON_5);
@@ -258,7 +278,6 @@ bool initializeMPU6050() {
   mpu.CalibrateGyro();
   Serial.println("Calibration complete!");
   playSuccessSound();
-  delay(1000);
   return true;
 }
 
@@ -319,6 +338,8 @@ void printJoystickValues(){
 }
 
 void playInitSound() {
+  setLEDColor("blue");
+  blinkLED();
   tone(buzzerPin, 1000);  // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   noTone(buzzerPin); // Stop tone
@@ -329,6 +350,8 @@ void playInitSound() {
 }
 
 void playErrorSound() {
+  setLEDColor("red");
+  blinkLED();
   // The buzzer emits a distinct error sound by using a lower tone
   tone(buzzerPin, 500); // Play tone at 500 Hz
   delay(250); // Continue for 250 ms
@@ -340,6 +363,8 @@ void playErrorSound() {
 }
 
 void playSuccessSound() {
+  setLEDColor("green");
+  blinkLED();
   tone(buzzerPin, 1000); // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   tone(buzzerPin, 1200); // Increase tone to 1200 Hz
@@ -350,6 +375,8 @@ void playSuccessSound() {
 }
 
 void playSetupCompleteSound() {
+  setLEDColor("green");
+  blinkLED();
   // Play a simple ascending tone to indicate completion
   tone(buzzerPin, 800); // Play tone at 800 Hz
   delay(150); // Continue for 150 ms
@@ -366,4 +393,69 @@ void playSetupCompleteSound() {
   tone(buzzerPin, 1500); // Play higher tone at 1500 Hz
   delay(300); // Continue for 300 ms
   noTone(buzzerPin); // Stop tone
+}
+
+void blinkLED() {
+  unsigned long currentMillis = millis();
+
+  // Non-blocking LED blink code
+  if (currentMillis - lastBlink >= blinkInterval) {
+    // save the last time you blinked the LED
+    lastBlink = currentMillis;
+
+    // Toggle the LED states based on the control variables
+    if (blinkRed) {
+      digitalWrite(redPin, !digitalRead(redPin));
+    } else {
+      digitalWrite(redPin, LOW); // Ensure the LED is off if not blinking
+    }
+
+    if (blinkGreen) {
+      digitalWrite(greenPin, !digitalRead(greenPin));
+    } else {
+      digitalWrite(greenPin, LOW); // Ensure the LED is off if not blinking
+    }
+
+    if (blinkBlue) {
+      digitalWrite(bluePin, !digitalRead(bluePin));
+    } else {
+      digitalWrite(bluePin, LOW); // Ensure the LED is off if not blinking
+    }
+
+    if (blinkOrange) {
+      digitalWrite(redPin, !digitalRead(redPin));
+      digitalWrite(greenPin, !digitalRead(greenPin));
+    } else {
+      digitalWrite(redPin, LOW); // Ensure the LED is off if not blinkinggreenPin
+      digitalWrite(greenPin, LOW); // Ensure the LED is off if not blinkinggreenPin
+    }
+  }
+}
+
+void checkBatteryLevel() {
+  int batteryLevel = analogRead(A0); // Assume the battery level is read from analog pin A0
+  int batteryThreshold = 500; // Set a threshold for low battery
+
+  if (batteryLevel < batteryThreshold) {
+    setLEDColor("orange");
+  }
+}
+
+void setLEDColor(String color) {
+  // Set all blink flags to false initially
+  blinkRed = false;
+  blinkGreen = false;
+  blinkBlue = false;
+  blinkOrange = false;
+
+  // Check the input string and set the appropriate flag to true
+  if (color == "red") {
+    blinkRed = true;
+  } else if (color == "green") {
+    blinkGreen = true;
+  } else if (color == "blue") {
+    blinkBlue = true;
+  } else if (color == "orange") {
+    blinkOrange = true;
+  }
 }
