@@ -4,7 +4,7 @@ Welcome to the Joychair Interface project! This project aims to integrate the mo
 
 ![Joychair - ESP32](./Joychair_esp32.jpg)
 <div style="text-align: center;">
-  <img src="./Joychair_esp32.jpg" alt="Joychair - ESP32" style="max-height: 200px;">
+  <img src="./Joychair_esp32.jpg" alt="Joychair - ESP32" style="max-height: 50px;">
 </div>
 ## Project Overview
 
