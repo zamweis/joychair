@@ -58,6 +58,53 @@ The code for this project performs several key functions:
 1. **Wait for Player to Sit**: The system waits until the acceleration in the Z-axis exceeds the sitting threshold.
 2. **Tilt Forward to Calibrate**: Once the player is seated, they are prompted to tilt forward and hold the position for a few seconds. If the tilt is held for the required calibration duration, the system calculates the relative angle and sets the forward direction.
 3. **Forward Direction Defined**: After successful calibration, the system plays a setup complete sound and indicates that the forward direction is defined.
+## Axis Mapping and Joystick Calibration
+
+When integrating the Joychair with a VR environment, it is essential to adjust the axis mappings to suit the target application's requirements. The joystick values, which are derived from the MPU6050 sensor readings, must be mapped within the appropriate intervals for your setup.
+
+### Adjusting Axis Mapping
+
+The mapping of the pitch, roll, and yaw values to joystick inputs is critical for achieving smooth and intuitive navigation. Depending on the VR application's sensitivity and control scheme, you may need to calibrate the mapping intervals.
+
+1. **Define the Mapping Range:**
+   - Determine the minimum and maximum tilt angles that correspond to the joystick's minimum and maximum values. This range should reflect the comfortable and natural tilting limits of the Aeris Swopper chair.
+
+2. **Adjust the Intervals:**
+   - Modify the code to map the sensor readings to the joystick values. Ensure that the mapping intervals match the expected input range of your VR application. For instance, if your application expects joystick values from 0 to 32767, you need to map the sensor's tilt range to this interval.
+
+3. **Minimum Tilt Threshold:**
+   - Set a minimum tilt threshold to ensure that only intentional movements result in joystick input. This threshold helps filter out minor, unintentional shifts and maintains a stable VR navigation experience.
+
+### Example Code Snippet for Axis Mapping
+
+```cpp
+// Define the minimum and maximum tilt angles (in degrees)
+const float minTiltAngle = -10.0;
+const float maxTiltAngle = 10.0;
+
+// Define the joystick input range
+const int joystickMinValue = 0;
+const int joystickMaxValue = 32767;
+
+// Function to map tilt to joystick value
+int mapTiltToJoystick(float tiltAngle) {
+    return map(tiltAngle, minTiltAngle, maxTiltAngle, joystickMinValue, joystickMaxValue);
+}
+
+// Example usage in the main loop
+void loop() {
+    // Get the tilt angles from the MPU6050
+    float pitch = ...; // Get the pitch angle
+    float roll = ...;  // Get the roll angle
+
+    // Map the tilt angles to joystick values
+    int joystickX = mapTiltToJoystick(pitch);
+    int joystickY = mapTiltToJoystick(roll);
+
+    // Apply the mapped values to the joystick
+    bleGamepad.setAxes(joystickX, joystickY, ...);
+}
+```
 
 ## Additional Resources
 
