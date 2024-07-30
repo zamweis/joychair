@@ -53,6 +53,7 @@ long blinkInterval = 500;  // interval at which to blink (milliseconds)
 bool blinkRed = false;
 bool blinkBlue = false;
 bool blinkGreen = false;
+bool blinkGreenStatic = false;
 
 // Battery
 int batteryPin = 36; // ADC1 channel 0 is GPIO36
@@ -101,7 +102,11 @@ const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 
 void setup() {
   playInitSound();
-  blinkLED();
+
+  digitalWrite(redPin, HIGH);
+  digitalWrite(greenPin, LOW);
+  digitalWrite(bluePin, HIGH);
+
   Wire.begin();
 
   Serial.begin(115200);
@@ -134,7 +139,7 @@ void loop() {
   long currentMillis = millis();
 
   // Check the battery level
-  int batteryLevel = getBatteryLevel();
+  //int batteryLevel = getBatteryLevel();
 
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
@@ -189,6 +194,7 @@ void loop() {
         sittingCheckComplete = true;
         Serial.println("Player detected.");
         Serial.println("Tilt forward and hold for a few seconds...");
+        setLEDColor("green");
       }
       
       blinkLED();
@@ -251,7 +257,13 @@ void loop() {
         bleGamepad.release(BUTTON_5);
       }
       bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRx, joystickRy, joystickRz, 16383, 16383);
-      bleGamepad.setBatteryLevel(batteryLevel);
+      //bleGamepad.setBatteryLevel(batteryLevel);
+      if (blinkBlue) {
+        setLEDColor("none"); 
+      }
+      
+    } else {
+      setLEDColor("blue");
     }
   }
   blinkLED();
@@ -349,7 +361,7 @@ void printJoystickValues(){
 }
 
 void playInitSound() {
-  setLEDColor("blue");
+  setLEDColor("green");
   tone(buzzerPin, 1000);  // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   noTone(buzzerPin); // Stop tone
@@ -372,7 +384,7 @@ void playErrorSound() {
 }
 
 void playSuccessSound() {
-  setLEDColor("green");
+  setLEDColor("green-static");
   tone(buzzerPin, 1000); // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   tone(buzzerPin, 1200); // Increase tone to 1200 Hz
@@ -383,7 +395,7 @@ void playSuccessSound() {
 }
 
 void playSetupCompleteSound() {
-  setLEDColor("green");
+  setLEDColor("none");
   // Play a simple ascending tone to indicate completion
   tone(buzzerPin, 800); // Play tone at 800 Hz
   delay(150); // Continue for 150 ms
@@ -417,16 +429,20 @@ void blinkLED() {
       digitalWrite(bluePin, LOW);
     } else if (blinkGreen) {
       digitalWrite(redPin, LOW);
-      digitalWrite(greenPin, HIGH);
+      digitalWrite(greenPin, !digitalRead(greenPin));
       digitalWrite(bluePin, LOW);
     } else if (blinkBlue) {
       digitalWrite(redPin, LOW);
       digitalWrite(greenPin, LOW);
       digitalWrite(bluePin, !digitalRead(bluePin));
-    } else {
+    } else if (blinkGreenStatic) {
       digitalWrite(redPin, LOW);
-      digitalWrite(greenPin, LOW);
+      digitalWrite(greenPin, HIGH);
       digitalWrite(bluePin, LOW);
+    } else {
+      digitalWrite(redPin, HIGH);
+      digitalWrite(greenPin, LOW);
+      digitalWrite(bluePin, HIGH);
     }
   }
 }
@@ -436,6 +452,7 @@ void setLEDColor(String color) {
   blinkRed = false;
   blinkGreen = false;
   blinkBlue = false;
+  blinkGreenStatic = false;
 
   // Check the input string and set the appropriate flag to true
   if (color == "red") {
@@ -444,6 +461,8 @@ void setLEDColor(String color) {
     blinkGreen = true;
   } else if (color == "blue") {
     blinkBlue = true;
+  } else if (color == "green_static") {
+    blinkGreenStatic = true;
   }
 }
 
