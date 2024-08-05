@@ -107,7 +107,7 @@ void setup() {
   digitalWrite(greenPin, LOW);
   digitalWrite(bluePin, HIGH);
 
-  Wire.begin();
+  Wire.begin(4, 17);  
 
   Serial.begin(115200);
 
