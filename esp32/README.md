@@ -1,6 +1,6 @@
 # Joychair Interface for VR Navigation - ESP32
 
-Welcome to the Joychair Interface project for ESP32! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an ESP32 board. The ESP32 can transmit data over Bluetooth connection.
+Welcome to the Joychair Interface project for ESP32! This setup allows you to integrate the movements of an Aeris Swopper chair into virtual reality (VR) environments using an Sparkfun ESP32 Thing board. The ESP32 can transmit data over Bluetooth connection.
 
 ## Project Overview
 
