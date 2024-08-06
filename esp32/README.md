@@ -21,6 +21,15 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 3. Connect the RGB LED to three GPIO pins (e.g., GPIO11 for red, GPIO10 for green, GPIO9 for blue).
 4. Attach the MPU6050 IMU to the Aeris Swopper chair.
 
+### Casing
+## Spatial Light Transfer Files
+
+You can find the SLT files in the [case](./case) directory.
+
+- [Case.slt](./case/case.STL)
+- [Case_Lid.slt](./case/case_lid.STL)
+- [Push_Button.slt](./case/push_button.STL)
+  
 ## Software Setup
 
 ### Libraries
