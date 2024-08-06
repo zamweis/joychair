@@ -16,7 +16,7 @@ The Joychair Interface captures the movements of the Aeris Swopper chair and int
 - **Aeris Swopper Chair**
 
 ### Wiring
-1. Connect the MPU6050 IMU to the ESP32 via I2C (SDA to GPIO21, SCL to GPIO22).
+1. Connect the MPU6050 IMU to the ESP32 via I2C (SDA to GPIO4, SCL to GPIO17).
 2. Connect the buzzer to a GPIO pin (e.g., GPIO6).
 3. Connect the RGB LED to three GPIO pins (e.g., GPIO11 for red, GPIO10 for green, GPIO9 for blue).
 4. Attach the MPU6050 IMU to the Aeris Swopper chair.
