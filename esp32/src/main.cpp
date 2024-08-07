@@ -29,6 +29,7 @@
 
 // Function and variable declarations
 void blinkLED();
+void recalibrate();
 void playInitSound();
 int getBatteryLevel();
 void playErrorSound();
@@ -40,9 +41,7 @@ void printRollPitchYawAccelZ();
 void setLEDColor(String color);
 int applyDeadzone(int value, int deadzone);
 float calculateTilt(float pitch, float roll);
-float checkTilt(float pitch, float roll);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
-void recalibrate();
 
 // Define pin numbers for the RGB LED and button
 int redPin = 26;
@@ -220,7 +219,7 @@ void loop() {
 
     // Check for continuous tilt of 5 seconds
     if (!forwardDirectionDefined) {
-      if (checkTilt(pitch, roll) >= tiltTolerance) {
+      if (calculateTilt(pitch, roll) >= tiltTolerance) {
         if (lastTiltCheckTime == 0) {
           lastTiltCheckTime = millis(); // Start timing when tilt is sufficient
           playInitSound();
@@ -235,8 +234,8 @@ void loop() {
           Serial.println("Forward direction defined!");
           Serial.println("Setup Complete!");
         }
-        if (maxTiltAngle < checkTilt(pitch, roll)) {
-          maxTiltAngle = checkTilt(pitch, roll);
+        if (maxTiltAngle < calculateTilt(pitch, roll)) {
+          maxTiltAngle = calculateTilt(pitch, roll);
         }        
       } else {
         if (lastTiltCheckTime != 0) { // Play error sound only once
@@ -250,8 +249,8 @@ void loop() {
     }
 
     // always update maxTitl to better fit the player weight
-    if (maxTiltAngle < checkTilt(pitch, roll)) {
-          maxTiltAngle = checkTilt(pitch, roll);
+    if (maxTiltAngle < calculateTilt(pitch, roll)) {
+          maxTiltAngle = calculateTilt(pitch, roll);
     } 
 
     float cosAngle = -cos(relativeAngle);
@@ -359,10 +358,6 @@ float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
   float angle = atan2(proj_y, proj_x);
 
   return angle;
-}
-
-float checkTilt(float pitch, float roll) {
-  return max(abs(pitch), abs(roll));
 }
 
 float calculateTilt(float pitch, float roll){
