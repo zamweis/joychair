@@ -130,3 +130,34 @@ void loop() {
     // Apply the mapped values to the joystick
     bleGamepad.setAxes(joystickX, joystickY, ...);
 }
+```
+## Info ##
+
+### Battery Level
+
+Currently, the battery level measurement functionality is not working correctly with my SparkFun ESP32 Thing.
+
+### Example
+
+![Joychair - ESP32](./Joychair_esp32.jpg)
+
+## Additional Resources
+
+- [Aeris Swopper Product Page](https://en.aeris.de/products/aeris-swopper-wollmischung-capture-gruen): Learn more about the Aeris Swopper chair.
+- [Arduino Joystick Tutorial](https://www.instructables.com/Create-a-Joystick-Using-the-Arduino-Joystick-Libra/): Useful guide for setting up the Arduino Leonardo as a joystick.
+- [MPU6050 Wiring Guide](https://images.app.goo.gl/LdwjNLMtsEHgnhpH7): How to wire MPU6050
+- [Buzzer Wiring Guide](https://images.app.goo.gl/mgFJdeP5EhSxzM8t5): How to wire a buzzer
+- [RGB-LED Wiring Guide](https://images.app.goo.gl/b1UZzW2y5GSzTEi26): How to wire an RGB-LED
+- [Rechargeable Battery Integration](https://learn.adafruit.com/3d-printed-case-for-adafruit-feather/assembly): How to wire a rechargeable battery  
+
+## Contributors
+
+- Sam Weiler (@zamweis)
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+Feel free to reach out to the project team for any questions or feedback. Happy navigating in VR with Joychair Interface! 🎮🪑🌐
