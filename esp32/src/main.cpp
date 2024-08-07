@@ -42,12 +42,14 @@ int applyDeadzone(int value, int deadzone);
 float calculateTilt(float pitch, float roll);
 bool checkTilt(float pitch, float roll, float tolerance);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
+void recalibrate();
 
-// Define pin numbers for the RGB LED
-int redPin = 25;
-int greenPin = 26;
+// Define pin numbers for the RGB LED and button
+int redPin = 26;
+int greenPin = 25;
 int bluePin = 27;
 int buzzerPin = 13;
+int bootButtonPin = 0;  // Boot button is typically connected to GPIO 0
 long lastBlink = 0;  // will store last time LED was updated
 long blinkInterval = 500;  // interval at which to blink (milliseconds)
 bool blinkRed = false;
@@ -86,7 +88,7 @@ int joystickRy;
 int joystickRz;
 
 float cosAngle;
-float sinAngle;
+float sinAngle; 
 
 int jumpThreshold = 3000;
 
@@ -119,24 +121,38 @@ void setup() {
   // Initialize the battery pin as an input
   pinMode(batteryPin, INPUT);
 
+  // Initialize the boot button pin as input with internal pull-up resistor
+  pinMode(bootButtonPin, INPUT_PULLUP);
+
   Serial.println("Starting BLE work!");
   bleGamepad.begin();
 
-  // Initialize MPU6050
-  while(!initializeMPU6050()) {
-    Serial.println("Failed to initialize MPU6050.");
-    playErrorSound();
-    delay(1000);
+  if (!initializeMPU6050()) {
+    Serial.println("Failed to initialize MPU6050. Check connections and restart.");
+    while (true) {
+      delay(500);
+      playErrorSound();
+      delay(500);
+    }
   }
 
-  delay(500);
   Serial.println("Waiting for player to sit down...");
   playInitSound();
 }
 
-
 void loop() {
   long currentMillis = millis();
+
+  static unsigned long lastButtonPressTime = 0; // Track the last button press time
+  static bool lastButtonState = HIGH; // Track the previous state of the button
+  bool currentButtonState = digitalRead(bootButtonPin); // Read the current state of the button
+
+  // Check if the boot button is pressed (LOW state because of internal pull-up)
+  if (currentButtonState == LOW && lastButtonState == HIGH && currentMillis - lastButtonPressTime >= 1000) {
+    recalibrate();  // Call the recalibration for new forward direction
+    lastButtonPressTime = currentMillis; // Update the last button press time
+  }
+  lastButtonState = currentButtonState; // Update the last button state
 
   // Check the battery level
   //int batteryLevel = getBatteryLevel();
@@ -237,8 +253,8 @@ void loop() {
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Map new Roll and Pitch values to joystick axes
-    joystickX = map(newRoll, -10, 10, 0, 32767);
-    joystickY = map(newPitch, -10, 10, 0, 32767);
+    joystickX = map(newRoll, -25, 25, 0, 32767);
+    joystickY = map(newPitch, -25, 25, 0, 32767);
     joystickZ = map(accelZ, -32767, 32767, 0, 32767);
     joystickRx = map(newRoll, -90, 90, 0, 32767);
     joystickRy = map(newPitch, -90, 90, 0, 32767);
@@ -511,4 +527,14 @@ int getBatteryLevel() {
   Serial.println(batteryPercentage);
 
   return batteryPercentage;
+}
+
+// Define the pseudo-function
+void recalibrate() {
+  Serial.println("CLB button pressed!");
+  Serial.println("Waiting for new player");
+  forwardDirectionDefined = false;
+  sittingCheckComplete = false;
+  setLEDColor("green");
+  playInitSound();
 }
