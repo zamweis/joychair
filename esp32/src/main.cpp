@@ -40,7 +40,7 @@ void printRollPitchYawAccelZ();
 void setLEDColor(String color);
 int applyDeadzone(int value, int deadzone);
 float calculateTilt(float pitch, float roll);
-bool checkTilt(float pitch, float roll, float tolerance);
+float checkTilt(float pitch, float roll);
 float calculateRelativeAngle(float accelX, float accelY, float accelZ);
 void recalibrate();
 
@@ -75,6 +75,7 @@ float accelX;
 float accelY;
 float accelZ;
 float relativeAngle; // Angle of sensor rotation
+float maxTiltAngle; // Maximal tilt angle of player
 
 MPU6050 mpu;
 
@@ -219,7 +220,7 @@ void loop() {
 
     // Check for continuous tilt of 5 seconds
     if (!forwardDirectionDefined) {
-      if (checkTilt(pitch, roll, tiltTolerance)) {
+      if (checkTilt(pitch, roll) >= tiltTolerance) {
         if (lastTiltCheckTime == 0) {
           lastTiltCheckTime = millis(); // Start timing when tilt is sufficient
           playInitSound();
@@ -234,6 +235,9 @@ void loop() {
           Serial.println("Forward direction defined!");
           Serial.println("Setup Complete!");
         }
+        if (maxTiltAngle < checkTilt(pitch, roll)) {
+          maxTiltAngle = checkTilt(pitch, roll);
+        }        
       } else {
         if (lastTiltCheckTime != 0) { // Play error sound only once
           playErrorSound();
@@ -245,6 +249,11 @@ void loop() {
       return;
     }
 
+    // always update maxTitl to better fit the player weight
+    if (maxTiltAngle < checkTilt(pitch, roll)) {
+          maxTiltAngle = checkTilt(pitch, roll);
+    } 
+
     float cosAngle = -cos(relativeAngle);
     float sinAngle = -sin(relativeAngle);
 
@@ -253,8 +262,8 @@ void loop() {
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
     // Map new Roll and Pitch values to joystick axes
-    joystickX = map(newRoll, -25, 25, 0, 32767);
-    joystickY = map(newPitch, -25, 25, 0, 32767);
+    joystickX = map(newRoll, -maxTiltAngle, maxTiltAngle, 0, 32767);
+    joystickY = map(newPitch, -maxTiltAngle, maxTiltAngle, 0, 32767);
     joystickZ = map(accelZ, -32767, 32767, 0, 32767);
     joystickRx = map(newRoll, -90, 90, 0, 32767);
     joystickRy = map(newPitch, -90, 90, 0, 32767);
@@ -352,8 +361,8 @@ float calculateRelativeAngle(float accelX, float accelY, float accelZ) {
   return angle;
 }
 
-bool checkTilt(float pitch, float roll, float tolerance) {
-  return (abs(pitch) > tolerance || abs(roll) > tolerance);
+float checkTilt(float pitch, float roll) {
+  return max(abs(pitch), abs(roll));
 }
 
 float calculateTilt(float pitch, float roll){
@@ -535,6 +544,7 @@ void recalibrate() {
   Serial.println("Waiting for new player");
   forwardDirectionDefined = false;
   sittingCheckComplete = false;
+  maxTiltAngle = 0;
   setLEDColor("green");
   playInitSound();
 }
