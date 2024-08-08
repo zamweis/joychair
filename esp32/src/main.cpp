@@ -27,6 +27,25 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 
+// Define the number of buttons and hat switches
+#define numOfButtons 1 // No physical buttons, no virtual buttons needed
+#define numOfHatSwitches 0 // No hat switches
+
+// Enable axes based on MPU6050 capabilities
+#define enableX true
+#define enableY true
+#define enableZ true
+#define enableRZ true
+#define enableRX true
+#define enableRY true
+#define enableSlider1 false
+#define enableSlider2 false
+#define enableRudder false
+#define enableThrottle false
+#define enableAccelerator false
+#define enableBrake false
+#define enableSteering false
+
 // Function and variable declarations
 void blinkLED();
 void recalibrate();
@@ -126,8 +145,20 @@ void setup() {
   pinMode(bootButtonPin, INPUT_PULLUP);
 
   Serial.println("Starting BLE work!");
-  bleGamepad.begin();
+  // Initialize BLE Gamepad
+  BleGamepadConfiguration bleGamepadConfig;
+  bleGamepadConfig.setControllerType(CONTROLLER_TYPE_GAMEPAD);
+  bleGamepadConfig.setButtonCount(numOfButtons);
+  bleGamepadConfig.setHatSwitchCount(numOfHatSwitches);
+  bleGamepadConfig.setWhichAxes(enableX, enableY, enableZ, enableRX, enableRY, enableRZ, enableSlider1, enableSlider2);
+  bleGamepadConfig.setWhichSimulationControls(enableRudder, enableThrottle, enableAccelerator, enableBrake, enableSteering);
+  bleGamepadConfig.setModelNumber("1.0");
+  bleGamepadConfig.setSoftwareRevision("Software Rev 1");
+  bleGamepadConfig.setSerialNumber("1337");
+  bleGamepadConfig.setFirmwareRevision("2.0");
+  bleGamepadConfig.setHardwareRevision("4.0");
 
+  bleGamepad.begin(&bleGamepadConfig);
   if (!initializeMPU6050()) {
     Serial.println("Failed to initialize MPU6050. Check connections and restart.");
     while (true) {
@@ -278,14 +309,13 @@ void loop() {
     joystickY = applyDeadzone(joystickY, 5);
 
     if (bleGamepad.isConnected()) {
-      if (accelZ > jumpThreshold && currentMillis - lastJumpTime >= jumpCooldown) {
+      if (accelZ > jumpThreshold) {
         Serial.println("Jump detected!");
-        bleGamepad.press(BUTTON_5);
-        lastJumpTime = currentMillis; // Update the last jump time
+        bleGamepad.press(BUTTON_1);
       } else {
-        bleGamepad.release(BUTTON_5);
+        bleGamepad.release(BUTTON_1);
       }
-      bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRx, joystickRy, joystickRz, 16383, 16383);
+      bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRz, joystickRx, joystickRy);
       //bleGamepad.setBatteryLevel(batteryLevel);
       if (blinkBlue) {
         setLEDColor("none"); 
