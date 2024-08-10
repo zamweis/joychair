@@ -77,12 +77,13 @@ The Joychair Interface provides several key functionalities:
 
 ### Battery Level Monitoring
 
-- **Analog Reading**: Reads the battery level via an ADC pin, with current limitations on specific hardware configurations.
+- **Analog Reading**: Reads the battery level via Sparkfun Fuel Gauge
 
 ### Additional Functionalities
 
 - **Jump Detection**: Detects rapid acceleration changes to emulate a "jump" button press.
 - **Recalibration Button**: Allows recalibration of the forward direction by pressing a designated button on the microcontroller.
+- **Reset Button**: Allows to reset the microcontroller.
 
 ## Axis Mapping and Joystick Calibration
 
@@ -135,7 +136,9 @@ void loop() {
 
 ### Battery Level
 
-Currently, the battery level measurement functionality is not working correctly with my SparkFun ESP32 Thing.
+LED Blink Red: Battery below 20%
+LED Blink Yellow: Battery over 20%
+LED Blink Green: Battery over 50%
 
 ### Example
 
