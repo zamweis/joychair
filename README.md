@@ -132,7 +132,7 @@ void loop() {
     bleGamepad.setAxes(joystickX, joystickY, ...);
 }
 ```
-## Info ##
+## Additional Info ##
 
 ### Battery Level
 
