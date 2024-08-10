@@ -26,6 +26,7 @@
 #include <Wire.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+#include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h>
 
 // Define the number of buttons and hat switches
 #define numOfButtons 1 // No physical buttons, no virtual buttons needed
@@ -70,10 +71,11 @@ int buzzerPin = 13;
 int bootButtonPin = 0;  // Boot button is typically connected to GPIO 0
 long lastBlink = 0;  // will store last time LED was updated
 long blinkInterval = 500;  // interval at which to blink (milliseconds)
+bool isConnected = false;
 bool blinkRed = false;
-bool blinkBlue = false;
 bool blinkGreen = false;
-bool blinkGreenStatic = false;
+bool blinkYellow = false;
+
 
 // Battery
 int batteryPin = 36; // ADC1 channel 0 is GPIO36
@@ -97,7 +99,9 @@ float maxTiltAngle; // Maximal tilt angle of player
 
 MPU6050 mpu;
 
-BleGamepad bleGamepad("Joychair", "iXperienceLab", 100);
+SFE_MAX1704X lipo; // Defaults to the MAX17043
+
+BleGamepad bleGamepad("Joychair", "iXperienceLab", 50);
 
 int joystickX;
 int joystickY;
@@ -123,15 +127,21 @@ const float sittingAccelZThreshold = 4000; // Threshold for detecting sitting
 const float maxTiltTolerance = 45; // maximal estimated possible tilt 
 
 void setup() {
+  Serial.begin(115200);
+  Wire.begin(4, 17);  
   playInitSound();
 
   digitalWrite(redPin, HIGH);
   digitalWrite(greenPin, LOW);
   digitalWrite(bluePin, HIGH);
 
-  Wire.begin(4, 17);  
-
-  Serial.begin(115200);
+  if (lipo.begin() == false) {
+    Serial.println(F("MAX17043 not detected. Please check wiring. Freezing."));
+    while (1)
+      ;
+  }
+  
+  lipo.quickStart();
 
   // initialize the digital pin as an output.
   pinMode(redPin, OUTPUT);
@@ -174,26 +184,31 @@ void setup() {
 
 void loop() {
   long currentMillis = millis();
+  float soc = lipo.getSOC();
+  // Set LED color based on battery level
+  if (soc < 20.0) {
+    setLEDColor("red");
+  } else if (soc < 50.0) {
+    setLEDColor("yellow");
+  } else {
+    setLEDColor("green");
+  }  
 
-  static unsigned long lastButtonPressTime = 0; // Track the last button press time
-  static bool lastButtonState = HIGH; // Track the previous state of the button
-  bool currentButtonState = digitalRead(bootButtonPin); // Read the current state of the button
+  static unsigned long lastButtonPressTime = 0; 
+  static bool lastButtonState = HIGH; 
+  bool currentButtonState = digitalRead(bootButtonPin); 
 
-  // Check if the boot button is pressed (LOW state because of internal pull-up)
   if (currentButtonState == LOW && lastButtonState == HIGH && currentMillis - lastButtonPressTime >= 1000) {
-    recalibrate();  // Call the recalibration for new forward direction
-    lastButtonPressTime = currentMillis; // Update the last button press time
+    recalibrate();  
+    lastButtonPressTime = currentMillis; 
   }
-  lastButtonState = currentButtonState; // Update the last button state
-
-  // Check the battery level
-  //int batteryLevel = getBatteryLevel();
+  lastButtonState = currentButtonState; 
 
   if (!mpu.testConnection()) {
     Serial.println("MPU6050 connection lost. Trying to reconnect...");
     playErrorSound();
     unsigned long startAttemptTime = millis();
-    while (!mpu.testConnection() && millis() - startAttemptTime < 10000) { // 10 second timeout
+    while (!mpu.testConnection() && millis() - startAttemptTime < 10000) { 
       delay(500);
       Serial.print(".");
       if (!mpuInitialized) {
@@ -208,34 +223,21 @@ void loop() {
       Serial.println("Failed to reconnect MPU6050.");
       playErrorSound();
       blinkLED();
-      delay(5000); // Wait 5 seconds before trying again
-      return; // Skip the rest of the loop if not reconnected
+      delay(5000); 
+      return;
     }
   }
 
-  // Check for new data from DMP
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-    // Get Quaternion data
     mpu.dmpGetQuaternion(&q, fifoBuffer);
-    // Get gravity vector
     mpu.dmpGetGravity(&gravity, &q);
-    // Get Yaw, Pitch, and Roll
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
     accelZ = mpu.getAccelerationZ() - 16383;
-
-    // Convert to degrees
     yaw = ypr[0] * 180 / M_PI;
     pitch = ypr[1] * 180 / M_PI;
     roll = ypr[2] * 180 / M_PI;
-/*
-    Serial.print("Tilt: ");
-    Serial.print(calculateTilt(pitch, roll));
-    Serial.print("Accelz: ");
-    Serial.println(accelZ);
-*/
 
-    // Wait for player to sit
     if (!sittingCheckComplete) {
       if (accelZ > sittingAccelZThreshold) {
         playSuccessSound();
@@ -244,19 +246,16 @@ void loop() {
         Serial.println("Tilt forward and hold for a few seconds...");
         setLEDColor("green");
       }
-      
       blinkLED();
       return;
     }
 
-    // Check for continuous tilt of 5 seconds
     if (!forwardDirectionDefined) {
       if (calculateTilt(pitch, roll) >= tiltMinimum) {
         if (lastTiltCheckTime == 0) {
-          lastTiltCheckTime = millis(); // Start timing when tilt is sufficient
+          lastTiltCheckTime = millis(); 
           playInitSound();
         } else if (currentMillis - lastTiltCheckTime >= calibrationDuration) {
-          // Calculate relative angle
           relativeAngle = -calculateRelativeAngle(mpu.getAccelerationX(), mpu.getAccelerationY(), mpu.getAccelerationZ());
           Serial.print("Relative Angle: ");
           Serial.println(relativeAngle);
@@ -270,17 +269,15 @@ void loop() {
           maxTiltAngle = calculateTilt(pitch, roll);
         }
       } else {
-        if (lastTiltCheckTime != 0) { // Play error sound only once
+        if (lastTiltCheckTime != 0) { 
           playErrorSound();
         }
-        lastTiltCheckTime = 0; // Reset timing if tilt is not sufficient
+        lastTiltCheckTime = 0; 
       }
-      
       blinkLED();
       return;
     }
 
-    // always update maxTitl to better fit the player weight
     if (maxTiltAngle < calculateTilt(pitch, roll) && calculateTilt(pitch, roll) <= maxTiltTolerance) {
       maxTiltAngle = calculateTilt(pitch, roll);
     } 
@@ -288,23 +285,19 @@ void loop() {
     float cosAngle = -cos(relativeAngle);
     float sinAngle = -sin(relativeAngle);
 
-    // Rotate Roll and Pitch values according to the relative angle
     float newRoll = pitch * sinAngle + roll * cosAngle;
     float newPitch = pitch * cosAngle - roll * sinAngle;
 
-    // Clamp the values within the range
     newRoll = constrain(newRoll, -maxTiltAngle, maxTiltAngle);
     newPitch = constrain(newPitch, -maxTiltAngle, maxTiltAngle);
 
-    // Map new Roll and Pitch values to joystick axes
     joystickX = map(newRoll, -maxTiltAngle, maxTiltAngle+1, 0, 32767);
     joystickY = map(newPitch, -maxTiltAngle, maxTiltAngle+1, 0, 32767);
     joystickZ = map(accelZ, -32767, 32767, 0, 32767);
     joystickRx = map(newRoll, -90, 90, 0, 32767);
     joystickRy = map(newPitch, -90, 90, 0, 32767);
-    joystickRz = map(yaw, -180, 180, 0, 32767); // Use Yaw for Rz
+    joystickRz = map(yaw, -180, 180, 0, 32767); 
 
-    // Apply deadzones to X and Y axes
     joystickX = applyDeadzone(joystickX, 5);
     joystickY = applyDeadzone(joystickY, 5);
 
@@ -316,13 +309,10 @@ void loop() {
         bleGamepad.release(BUTTON_1);
       }
       bleGamepad.setAxes(joystickX, joystickY, joystickZ, joystickRz, joystickRx, joystickRy);
-      //bleGamepad.setBatteryLevel(batteryLevel);
-      if (blinkBlue) {
-        setLEDColor("none"); 
-      }
-      
+      bleGamepad.setBatteryLevel(soc);
+      isConnected=true;
     } else {
-      setLEDColor("blue");
+      isConnected = false;
     }
   }
   blinkLED();
@@ -439,7 +429,7 @@ void playErrorSound() {
 }
 
 void playSuccessSound() {
-  setLEDColor("green-static");
+  setLEDColor("green");
   tone(buzzerPin, 1000); // Play tone at 1000 Hz
   delay(150); // Continue for 150 ms
   tone(buzzerPin, 1200); // Increase tone to 1200 Hz
@@ -477,28 +467,46 @@ void blinkLED() {
     // save the last time you blinked the LED
     lastBlink = currentMillis;
 
-    // Toggle the LED states based on the control variables
-    if (blinkRed) {
-      digitalWrite(redPin, !digitalRead(redPin));
-      digitalWrite(greenPin, LOW);
-      digitalWrite(bluePin, LOW);
-    } else if (blinkGreen) {
-      digitalWrite(redPin, LOW);
-      digitalWrite(greenPin, !digitalRead(greenPin));
-      digitalWrite(bluePin, LOW);
-    } else if (blinkBlue) {
-      digitalWrite(redPin, LOW);
-      digitalWrite(greenPin, LOW);
-      digitalWrite(bluePin, !digitalRead(bluePin));
-    } else if (blinkGreenStatic) {
-      digitalWrite(redPin, LOW);
-      digitalWrite(greenPin, HIGH);
-      digitalWrite(bluePin, LOW);
+    if (isConnected) {
+      // Toggle the LED states based on the control variables
+      if (blinkRed) {
+        digitalWrite(redPin, HIGH);
+        digitalWrite(greenPin, LOW);
+        digitalWrite(bluePin, LOW);
+      } else if (blinkGreen) {
+        digitalWrite(redPin, LOW);
+        digitalWrite(greenPin, HIGH);
+        digitalWrite(bluePin, LOW);
+      } else if (blinkYellow) {
+        digitalWrite(redPin, HIGH);
+        digitalWrite(greenPin, HIGH);
+        digitalWrite(bluePin, LOW);
+      } else {
+        // Default state Pink
+        digitalWrite(redPin, HIGH);
+        digitalWrite(greenPin, LOW);
+        digitalWrite(bluePin, HIGH);
+      }
     } else {
-      digitalWrite(redPin, HIGH);
-      digitalWrite(greenPin, LOW);
-      digitalWrite(bluePin, HIGH);
-    }
+      if (blinkRed) {
+        digitalWrite(redPin, !digitalRead(redPin));
+        digitalWrite(greenPin, LOW);
+        digitalWrite(bluePin, LOW);
+      } else if (blinkGreen) {
+        digitalWrite(redPin, LOW);
+        digitalWrite(greenPin, !digitalRead(greenPin));
+        digitalWrite(bluePin, LOW);
+      } else if (blinkYellow) {
+        digitalWrite(redPin, !digitalRead(redPin));
+        digitalWrite(greenPin, !digitalRead(greenPin));
+        digitalWrite(bluePin, LOW);
+      } else {
+        // Default state Pink
+        digitalWrite(redPin, HIGH);
+        digitalWrite(greenPin, LOW);
+        digitalWrite(bluePin, HIGH);
+      }
+    }  
   }
 }
 
@@ -506,66 +514,20 @@ void setLEDColor(String color) {
   // Set all blink flags to false initially
   blinkRed = false;
   blinkGreen = false;
-  blinkBlue = false;
-  blinkGreenStatic = false;
+  blinkYellow = false;
 
-  // Check the input string and set the appropriate flag to true
+  // Statische Farben, wenn verbunden
   if (color == "red") {
     blinkRed = true;
   } else if (color == "green") {
     blinkGreen = true;
-  } else if (color == "blue") {
-    blinkBlue = true;
-  } else if (color == "green_static") {
-    blinkGreenStatic = true;
+  } else if (color == "yellow") {
+    blinkYellow = true;
+  } else if (color == "none") {
+    digitalWrite(redPin, HIGH);
+    digitalWrite(greenPin, LOW);
+    digitalWrite(bluePin, HIGH);
   }
-}
-
-int getBatteryLevel() {
-  // Read the raw analog value from the battery pin
-  int rawValue = analogRead(batteryPin);
-
-  // Debugging output for raw ADC value
-  Serial.print("Raw ADC Value: ");
-  Serial.println(rawValue);
-
-  // If the raw ADC value is 0, there's likely an issue with the hardware connection
-  if (rawValue == 0) {
-    Serial.println("Error: ADC read value is 0. Check battery connection and pin configuration.");
-    return 0;
-  }
-
-  // Convert the raw value to a voltage level
-  // ESP32 ADC resolution is 12 bits (4095 levels) and default reference voltage is 3.3V
-  float batteryVoltage = (rawValue / 4095.0) * 3.3;
-
-  // Debugging output for voltage
-  Serial.print("Battery Voltage: ");
-  Serial.println(batteryVoltage);
-
-  // Adjust the voltage based on the known maximum ADC input voltage
-  // SparkFun ESP32 Thing has a voltage divider that scales down the voltage by a factor of 2
-  batteryVoltage *= 2;
-
-  // Debugging output for adjusted voltage
-  Serial.print("Adjusted Battery Voltage: ");
-  Serial.println(batteryVoltage);
-
-  // Calculate the battery percentage
-  int batteryPercentage = (int)((batteryVoltage - minBatteryVoltage) / (maxBatteryVoltage - minBatteryVoltage) * 100);
-
-  // Ensure the percentage is within 0-100%
-  if (batteryPercentage < 0) {
-    batteryPercentage = 0;
-  } else if (batteryPercentage > 100) {
-    batteryPercentage = 100;
-  }
-
-  // Debugging output for battery percentage
-  Serial.print("Battery Percentage: ");
-  Serial.println(batteryPercentage);
-
-  return batteryPercentage;
 }
 
 // Reclibration for forward direction
