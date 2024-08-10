@@ -136,9 +136,9 @@ void loop() {
 
 ### Battery Level
 
-LED Blink Red: Battery below 20%
-LED Blink Yellow: Battery over 20%
-LED Blink Green: Battery over 50%
+LED Blink Red: Battery below 20%  
+LED Blink Yellow: Battery over 20%   
+LED Blink Green: Battery over 50%  
 
 ### Example
 
