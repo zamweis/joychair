@@ -142,7 +142,7 @@ LED Blink Green: Battery over 50%
 
 ### Example
 
-![Joychair - ESP32](./Joychair_esp32.jpg)
+![Joychair - ESP32](./Joychair_esp32.png)
 
 ## Additional Resources
 
